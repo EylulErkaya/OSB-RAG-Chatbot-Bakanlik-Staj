@@ -1,0 +1,64 @@
+# =========================
+# Python
+# =========================
+__pycache__/
+*.py[cod]
+*.pyo
+
+# =========================
+# Virtual Environment
+# =========================
+.venv/
+venv/
+env/
+
+# =========================
+# Environment Variables
+# =========================
+.env
+.env.*
+!.env.example
+
+# =========================
+# IDE
+# =========================
+.vscode/
+.idea/
+*.code-workspace
+
+# =========================
+# Operating System
+# =========================
+.DS_Store
+Thumbs.db
+
+# =========================
+# Logs / Temporary
+# =========================
+*.log
+*.tmp
+*.temp
+
+# =========================
+# Embeddings
+# =========================
+data/embeddings/
+*.pkl
+
+# =========================
+# Original / Generated Data
+# =========================
+data/*.xlsx
+data/normalized/*.csv
+data/documents/*.jsonl
+
+# =========================
+# Local Vector Database
+# =========================
+data/vector_db/
+
+# =========================
+# Model / Cache Files
+# =========================
+models/
+.cache/
