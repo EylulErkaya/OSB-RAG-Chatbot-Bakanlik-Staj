@@ -27,7 +27,7 @@ import re
 import chromadb
 import ollama
 
-from sector_resolver import (
+from .sector_resolver import (
     extract_sector_keyword,
     matches_sector,
 )
