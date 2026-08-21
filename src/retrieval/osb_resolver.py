@@ -146,12 +146,72 @@ def resolve_osb(
             "city": str(row["İl Adı"]),
             "district": str(row["İlçe"]),
             "region": str(row["Bölge"]),
+            "data": row.to_dict(),
         })
 
     return {
         "status": "ambiguous",
         "candidates": candidate_list
     }
+
+
+def compare_candidate_field(
+    candidates,
+    field
+):
+    """
+    Birden fazla OSB adayının belirli bir alandaki
+    değerlerini karşılaştırır.
+
+    Sonuç:
+        same     -> bütün adaylarda değer aynı
+        different -> değerler farklı
+        missing  -> alan bulunamadı
+    """
+
+    values = []
+
+    for candidate in candidates:
+
+        data = candidate.get("data", {})
+
+        value = data.get(field)
+
+        if pd.isna(value):
+            value = None
+
+        if value is not None:
+            value = str(value).strip()
+
+        values.append(value)
+
+    # Hiçbir adayda veri yok
+    if all(value is None for value in values):
+        return {
+            "status": "missing",
+            "values": values
+        }
+
+    # Değerleri karşılaştır
+    unique_values = set(
+        value
+        for value in values
+        if value is not None
+    )
+
+    if len(unique_values) == 1:
+        return {
+            "status": "same",
+            "value": next(iter(unique_values)),
+            "values": values
+        }
+
+    return {
+        "status": "different",
+        "values": values
+    }
+
+
 
 
 # ============================================================

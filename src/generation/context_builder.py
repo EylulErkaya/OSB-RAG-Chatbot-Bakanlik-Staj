@@ -420,31 +420,55 @@ class ContextBuilder:
                 "Lütfen hangi OSB'yi kastettiğinizi belirtin."
             )
 
-        names = []
+        lines = [
+            "Birden fazla OSB kaydı bulundu.",
+            "Lütfen hangisini kastettiğinizi seçin:",
+            "",
+        ]
 
-        for candidate in candidates:
+        for index, candidate in enumerate(
+            candidates,
+            start=1
+        ):
 
             name = candidate.get(
                 "name",
                 "Bilinmeyen OSB"
             )
 
+            city = candidate.get(
+                "city"
+            )
+
             district = candidate.get(
                 "district"
             )
 
-            if district:
-                names.append(
-                    f"{name} ({district})"
-                )
-            else:
-                names.append(name)
+            if city and district:
 
-        return (
-            "Birden fazla OSB kaydı bulundu. "
-            "Lütfen hangisini kastettiğinizi belirtin:\n"
-            + "\n".join(
-                f"- {name}"
-                for name in names
-            )
-        )   
+                lines.append(
+                    f"{index}. {name} "
+                    f"— {city} / {district}"
+                )
+
+            elif city:
+
+                lines.append(
+                    f"{index}. {name} "
+                    f"— {city}"
+                )
+
+            else:
+
+                lines.append(
+                    f"{index}. {name}"
+                )
+
+        lines.append("")
+
+        lines.append(
+            f"Lütfen 1-{len(candidates)} "
+            "arasında bir seçim yapın."
+        )
+
+        return "\n".join(lines)  

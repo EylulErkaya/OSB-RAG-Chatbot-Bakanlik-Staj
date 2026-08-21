@@ -15,6 +15,9 @@ CHROMA_PATH = Path("data/vectorstore/chroma")
 
 COLLECTION_NAME = "osb_knowledge_base"
 
+EXPECTED_MODEL = "nomic-embed-text:v1.5"
+EXPECTED_DIMENSION = 768
+
 BATCH_SIZE = 500
 
 
@@ -41,7 +44,7 @@ if not EMBEDDINGS_PATH.exists():
 # CHUNK'LARI OKU
 # ============================================================
 
-print("\n[1/5] Chunk'lar okunuyor...")
+print("\n[1/6] Chunk'lar okunuyor...")
 
 chunks = []
 
@@ -65,7 +68,7 @@ print(f"Chunk sayısı: {len(chunks)}")
 # EMBEDDING'LERİ OKU
 # ============================================================
 
-print("\n[2/5] Embedding'ler okunuyor...")
+print("\n[2/6] Embedding'ler okunuyor...")
 
 with open(
     EMBEDDINGS_PATH,
@@ -87,28 +90,32 @@ print(f"Embedding modeli: {model_name}")
 
 
 # ============================================================
-# EŞLEŞME KONTROLÜ
+# DOĞRULAMALAR
 # ============================================================
 
-print("\n[3/5] Veri eşleşmesi kontrol ediliyor...")
+print("\n[3/6] Doğrulamalar yapılıyor...")
+
+has_error = False
+
+
+# --------------------------------------------------
+# CHUNK / EMBEDDING SAYISI EŞİT Mİ?
+# --------------------------------------------------
 
 if len(chunks) != len(embeddings):
-
-    raise ValueError(
-        f"Chunk ve embedding sayıları eşleşmiyor!\n"
-        f"Chunk: {len(chunks)}\n"
-        f"Embedding: {len(embeddings)}"
+    print(
+        f"❌ Chunk ve embedding sayıları eşleşmiyor!\n"
+        f"   Chunk: {len(chunks)}\n"
+        f"   Embedding: {len(embeddings)}"
     )
-
-print(
-    f"✓ {len(chunks)} chunk "
-    f"↔ {len(embeddings)} embedding"
-)
+    has_error = True
+else:
+    print(f"✓ {len(chunks)} chunk ↔ {len(embeddings)} embedding")
 
 
-# ============================================================
-# CHUNK ID KONTROLÜ
-# ============================================================
+# --------------------------------------------------
+# DUPLICATE CHUNK ID VAR MI?
+# --------------------------------------------------
 
 chunk_ids = [
     chunk["chunk_id"]
@@ -116,21 +123,52 @@ chunk_ids = [
 ]
 
 if len(chunk_ids) != len(set(chunk_ids)):
+    print("❌ Duplicate chunk_id bulundu!")
+    has_error = True
+else:
+    print(f"✓ {len(chunk_ids)} benzersiz chunk ID")
 
-    raise ValueError(
-        "Duplicate chunk_id bulundu!"
+
+# --------------------------------------------------
+# EMBEDDING BOYUTU DOĞRU MU?
+# --------------------------------------------------
+
+actual_dimension = len(embeddings[0]) if embeddings else 0
+
+if actual_dimension != EXPECTED_DIMENSION:
+    print(
+        f"❌ Embedding boyutu {EXPECTED_DIMENSION} değil: "
+        f"{actual_dimension}"
     )
+    has_error = True
+else:
+    print(f"✓ Embedding boyutu doğru: {actual_dimension}")
 
-print(
-    f"✓ {len(chunk_ids)} benzersiz chunk ID"
-)
+
+# --------------------------------------------------
+# MODEL DOĞRU MU?
+# --------------------------------------------------
+
+if model_name != EXPECTED_MODEL:
+    print(
+        f"❌ Model beklenenle eşleşmiyor: "
+        f"{model_name} != {EXPECTED_MODEL}"
+    )
+    has_error = True
+else:
+    print(f"✓ Model doğru: {model_name}")
+
+
+if has_error:
+    print("\n⚠️ Doğrulama başarısız. ChromaDB oluşturulmadı.")
+    raise SystemExit(1)
 
 
 # ============================================================
 # CHROMA CLIENT
 # ============================================================
 
-print("\n[4/5] ChromaDB başlatılıyor...")
+print("\n[4/6] ChromaDB başlatılıyor...")
 
 CHROMA_PATH.mkdir(
     parents=True,
@@ -141,7 +179,16 @@ client = chromadb.PersistentClient(
     path=str(CHROMA_PATH)
 )
 
-collection = client.get_or_create_collection(
+# Eski collection varsa tamamen sil.
+try:
+    client.delete_collection(
+        name=COLLECTION_NAME
+    )
+    print(f"Eski collection silindi: {COLLECTION_NAME}")
+except Exception:
+    print("Eski collection bulunamadı, yeni oluşturulacak.")
+
+collection = client.create_collection(
     name=COLLECTION_NAME,
     metadata={
         "description": "OSB RAG Knowledge Base",
@@ -149,6 +196,8 @@ collection = client.get_or_create_collection(
         "embedding_dimension": len(embeddings[0]),
     }
 )
+
+print(f"Yeni collection oluşturuldu: {COLLECTION_NAME}")
 
 print(
     f"Collection: {COLLECTION_NAME}"
@@ -163,7 +212,7 @@ print(
 # VERİLERİ CHROMA'YA AKTAR
 # ============================================================
 
-print("\n[5/5] ChromaDB'ye kayıtlar ekleniyor...")
+print("\n[5/6] ChromaDB'ye kayıtlar ekleniyor...")
 
 total = len(chunks)
 
@@ -238,6 +287,8 @@ for start in range(
 # SON KONTROL
 # ============================================================
 
+print("\n[6/6] Son kontrol yapılıyor...")
+
 final_count = collection.count()
 
 print("\n" + "=" * 70)
@@ -271,10 +322,14 @@ print(
 
 if final_count == total:
 
-    print("\n🎉 CHROMADB INDEX BAŞARIYLA OLUŞTURULDU!")
+    print(
+        "\n🎉 CHROMADB INDEX BAŞARIYLA OLUŞTURULDU! "
+        f"Kayıt sayısı beklenen değerle eşleşiyor: {final_count}"
+    )
 
 else:
 
     raise RuntimeError(
-        "ChromaDB kayıt sayısı beklenen değerle eşleşmiyor!"
+        f"ChromaDB kayıt sayısı beklenen değerle eşleşmiyor! "
+        f"Beklenen: {total}, Mevcut: {final_count}"
     )

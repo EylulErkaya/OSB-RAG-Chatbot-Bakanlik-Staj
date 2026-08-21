@@ -56,6 +56,7 @@ data/documents/*.jsonl
 # Local Vector Database
 # =========================
 data/vector_db/
+data/vectorstore/
 
 # =========================
 # Model / Cache Files

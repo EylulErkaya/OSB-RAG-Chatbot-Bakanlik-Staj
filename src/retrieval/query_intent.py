@@ -45,6 +45,10 @@ INTENT_RULES = {
         "sicil",
         "nerede",
         "hangi bölgede",
+        "deprem",
+        "deprem bölgesi",
+        "yatırım",
+        "yatırım programı",
     ],
 }
 
@@ -74,6 +78,28 @@ def detect_intent(query: str):
         intent: 0
         for intent in INTENT_RULES
     }
+    
+    # ============================================================
+    # ÜRETİM / İNŞAAT / PROJE BAĞLAMINDA PARSEL
+    # ============================================================
+    # "üretimde kaç parsel", "inşaattaki parsel",
+    # "projede bulunan parsel" gibi sorular aslında
+    # employment chunk'ındaki bilgiyi hedefler.
+
+    production_context_keywords = [
+        "üretimde",
+        "üretimdeki",
+        "inşaatta",
+        "inşaattaki",
+        "projede",
+        "projedeki",
+    ]
+
+    if "parsel" in query and any(
+        keyword in query
+        for keyword in production_context_keywords
+    ):
+        scores["employment"] += 2
 
     # --------------------------------------------------------
     # KELİME EŞLEŞMESİ
@@ -111,7 +137,6 @@ def detect_intent(query: str):
         for keyword in sector_specific_keywords
     ):
         scores["sector"] += 2
-
 
     # --------------------------------------------------------
     # EN YÜKSEK SKOR
@@ -248,3 +273,76 @@ if __name__ == "__main__":
             f"Scores: "
             f"{result['scores']}"
         )
+        
+def detect_requested_field(query: str):
+    """
+    Kullanıcının hangi OSB alanını sorduğunu belirler.
+    """
+
+    query = query.lower().strip()
+
+    field_rules = [
+        (
+            [
+                "kuruluş yılı",
+                "kurulus yili",
+                "kaç yılında kuruldu",
+                "ne zaman kuruldu",
+            ],
+            "OSB Kuruluş Yılı",
+        ),
+        (
+            [
+                "kuruluş tarihi",
+                "kurulus tarihi",
+                "kuruluş tarihi nedir",
+            ],
+            "OSB Kuruluş Tarihi",
+        ),
+        (
+            [
+                "hangi bölgede",
+                "hangi bölge",
+            ],
+            "Bölge",
+        ),
+        (
+            [
+                "hangi ilde",
+                "hangi il",
+            ],
+            "İl Adı",
+        ),
+        (
+            [
+                "hangi ilçede",
+                "hangi ilçe",
+                "ilçesi nedir",
+            ],
+            "İlçe",
+        ),
+        (
+            [
+                "teşvik bölgesi",
+                "kaçıncı teşvik",
+            ],
+            "Teşvik Bölgelerine Göre İller",
+        ),
+        (
+            [
+                "osb türü",
+                "türü nedir",
+                "hangi tür",
+            ],
+            "OSB Türü",
+        ),
+    ]
+
+    for keywords, field in field_rules:
+
+        for keyword in keywords:
+
+            if keyword in query:
+                return field
+
+    return None

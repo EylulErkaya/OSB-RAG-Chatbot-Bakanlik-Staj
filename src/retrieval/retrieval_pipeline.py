@@ -27,37 +27,26 @@ import re
 import chromadb
 import ollama
 
+from src.retrieval.osb_resolver import (
+    resolve_osb,
+    compare_candidate_field,
+)
+
 from .sector_resolver import (
     extract_sector_keyword,
     matches_sector,
 )
 
 # ============================================================
-# PYTHON PATH
-# ============================================================
-
-CURRENT_DIR = os.path.dirname(
-    os.path.abspath(__file__)
-)
-
-SRC_DIR = os.path.dirname(
-    CURRENT_DIR
-)
-
-if SRC_DIR not in sys.path:
-    sys.path.insert(0, SRC_DIR)
-
-
-# ============================================================
 # PROJECT IMPORTS
 # ============================================================
 
-from retrieval.osb_resolver import resolve_osb
-from retrieval.query_intent import (
+from src.retrieval.query_intent import (
     detect_intent,
     get_chunk_type,
+    detect_requested_field,
 )
-from retrieval.reranker import Reranker
+from src.retrieval.reranker import Reranker
 
 
 # ============================================================
@@ -119,7 +108,7 @@ def extract_osb_name(query: str):
 
     text = query.strip()
 
-    match = re.search(r"\bOSB\b", text, flags=re.IGNORECASE)
+    match = re.search(r"\bOSB(?:'?[a-zA-ZçğıöşüÇĞİÖŞÜ]+)?", text, flags=re.IGNORECASE)
     if not match:
         return None
 
@@ -221,6 +210,8 @@ def create_query_embedding(query: str):
 def retrieve(
     query: str,
     top_k: int = CHROMA_TOP_K,
+    selected_osb_id: int | None = None,
+    selected_osb_name: str | None = None,
 ):
     """
     Gerçek retrieval pipeline.
@@ -255,15 +246,45 @@ def retrieve(
 
     sector_keyword = None
     effective_top_k = top_k
+    is_listing_query = False
+
+    # ------------------------------------------------------------
+    # SEKTÖR SORGUSU
+    # ------------------------------------------------------------
 
     if chunk_type == "sector":
+
         sector_keyword = extract_sector_keyword(
             query
         )
 
+        # Belirli bir sektör aranıyorsa daha fazla aday getir.
         if sector_keyword:
             effective_top_k = max(
                 top_k,
+                32
+            )
+
+        # Genel sektör listeleme sorgusu
+        # Örn:
+        # "hangi sektör bulunuyor?"
+        # "hangi sektörler var?"
+        # "sektörler nelerdir?"
+        listing_patterns = [
+            "hangi sektör",
+            "hangi sektörler",
+            "sektörler nelerdir",
+            "sektör listesi",
+        ]
+
+        is_listing_query = any(
+            pattern in query.lower()
+            for pattern in listing_patterns
+        )
+
+        if is_listing_query:
+            effective_top_k = max(
+                effective_top_k,
                 32
             )
 
@@ -310,90 +331,136 @@ def retrieve(
 
 
     # ========================================================
+    # ========================================================
     # 4. OSB ENTITY RESOLUTION
     # ========================================================
 
-    osb_result = resolve_osb(
-        osb_name,
-        city
-    )
+    if selected_osb_id is not None:
 
-    status = osb_result[
-        "status"
-    ]
+        # Kullanıcı ambiguous seçim yaptı.
+        # Resolver tekrar çalıştırılmıyor.
 
+        osb_id = int(selected_osb_id)
 
-    # ========================================================
-    # OSB BULUNAMADI
-    # ========================================================
-
-    if status == "not_found":
-
-        # ----------------------------------------------------
-        # Şehir filtresi fazla kısıtlayıcı olabilir.
-        # Bu yüzden city olmadan ikinci kez deniyoruz.
-        # ----------------------------------------------------
-
-        osb_result = resolve_osb(
-            osb_name
+        resolved_osb_name = (
+            selected_osb_name
+            or osb_name
         )
 
-        status = osb_result[
-            "status"
-        ]
+    else:
 
+        osb_result = resolve_osb(
+            osb_name,
+            city
+        )
 
-    # ========================================================
-    # HALA BULUNAMADI
-    # ========================================================
+        status = osb_result["status"]
 
-    if status == "not_found":
+        # ----------------------------------------------------
+        # OSB BULUNAMADI
+        # ----------------------------------------------------
 
-        return {
-            "status": "not_found",
-            "query": query,
-            "intent": intent,
-            "intent_confidence": intent_confidence,
-            "chunk_type": chunk_type,
-            "osb_id": None,
-            "osb_name": osb_name,
-            "results": [],
-        }
+        if status == "not_found":
 
+            osb_result = resolve_osb(
+                osb_name
+            )
 
-    # ========================================================
-    # OSB BELİRSİZ
-    # ========================================================
+            status = osb_result["status"]
 
-    if status == "ambiguous":
+        # ----------------------------------------------------
+        # HALA BULUNAMADI
+        # ----------------------------------------------------
 
-        return {
-            "status": "ambiguous",
-            "query": query,
-            "intent": intent,
-            "intent_confidence": intent_confidence,
-            "chunk_type": chunk_type,
-            "osb_id": None,
-            "osb_name": osb_name,
-            "candidates": osb_result.get(
+        if status == "not_found":
+
+            return {
+                "status": "not_found",
+                "query": query,
+                "intent": intent,
+                "intent_confidence": intent_confidence,
+                "chunk_type": chunk_type,
+                "osb_id": None,
+                "osb_name": osb_name,
+                "results": [],
+            }
+
+        # ----------------------------------------------------
+        # AMBIGUOUS
+        # ----------------------------------------------------
+
+        if status == "ambiguous":
+
+            candidates = osb_result.get(
                 "candidates",
                 [],
-            ),
-            "results": [],
-        }
+            )
 
+            requested_field = detect_requested_field(
+                query
+            )
 
-    # ========================================================
-    # UNIQUE OSB
-    # ========================================================
+            if requested_field:
 
-    osb_id = osb_result[
-        "osb_id"
-    ]
+                comparison = compare_candidate_field(
+                    candidates,
+                    requested_field,
+                )
 
-    resolved_osb_name = osb_result[
-        "osb_name"
-    ]
+                if comparison["status"] == "same":
+
+                    common_value = comparison["value"]
+
+                    return {
+                        "status": "success",
+                        "query": query,
+                        "intent": intent,
+                        "intent_confidence": intent_confidence,
+                        "chunk_type": chunk_type,
+                        "osb_id": None,
+                        "osb_name": osb_name,
+                        "requested_field": requested_field,
+                        "resolved_common_value": common_value,
+                        "candidates": candidates,
+                        "results": [],
+                    }
+
+                if comparison["status"] == "different":
+
+                    return {
+                        "status": "ambiguous",
+                        "query": query,
+                        "intent": intent,
+                        "intent_confidence": intent_confidence,
+                        "chunk_type": chunk_type,
+                        "osb_id": None,
+                        "osb_name": osb_name,
+                        "requested_field": requested_field,
+                        "candidates": candidates,
+                        "comparison": comparison,
+                        "results": [],
+                    }
+
+            return {
+                "status": "ambiguous",
+                "query": query,
+                "intent": intent,
+                "intent_confidence": intent_confidence,
+                "chunk_type": chunk_type,
+                "osb_id": None,
+                "osb_name": osb_name,
+                "requested_field": requested_field,
+                "candidates": candidates,
+                "results": [],
+            }
+
+        # ----------------------------------------------------
+        # UNIQUE OSB
+        # ----------------------------------------------------
+
+        osb_id = osb_result["osb_id"]
+
+        resolved_osb_name = osb_result["osb_name"]
 
 
     # ========================================================
@@ -525,12 +592,16 @@ def retrieve(
     # 9. RERANKING
     # ========================================================
 
+    rerank_top_k = RERANK_TOP_K
+
+    if chunk_type == "sector" and is_listing_query:
+        rerank_top_k = effective_top_k
+
     reranked = reranker.rerank(
         query=query,
         candidates=candidates,
-        top_k=RERANK_TOP_K,
-    )
-
+        top_k=rerank_top_k,
+)
 
     # ========================================================
     # 10. FINAL RESULT
@@ -781,19 +852,58 @@ def print_results(result):
 
 TEST_QUERIES = [
 
+    # ========================================================
+    # PARSEL
+    # ========================================================
+
     "Malatya-Güney OSB'de kaç boş parsel var?",
+
+    # ========================================================
+    # İSTİHDAM / FABRİKA
+    # ========================================================
 
     "Malatya-Güney OSB'de kaç fabrika üretim yapıyor?",
 
     "Malatya-Güney OSB'de kaç kişi istihdam ediliyor?",
 
+    # ========================================================
+    # GENEL
+    # ========================================================
+
     "Malatya-Güney OSB hangi bölgede bulunuyor?",
+
+    # ========================================================
+    # SEKTÖR
+    # ========================================================
 
     "Malatya-Güney OSB'de gıda sektöründe kaç kişi çalışıyor?",
 
-    "Malatya OSB'de kaç fabrika üretim yapıyor?",
-]
+    # ========================================================
+    # DEPREM BÖLGESİ
+    # ========================================================
 
+    "Malatya-Güney OSB deprem bölgesinde mi?",
+
+    # ========================================================
+    # YATIRIM PROGRAMI
+    # ========================================================
+
+    "Malatya-Güney OSB yatırım programında mı?",
+
+    # ========================================================
+    # AMBIGUOUS
+    # ========================================================
+
+    "Malatya OSB'de kaç fabrika üretim yapıyor?",
+
+    "Malatya OSB deprem bölgesinde mi?",
+
+    # ========================================================
+    # NOT FOUND
+    # ========================================================
+
+    "Olmayanşehir OSB'de kaç boş parsel var?",
+]
 
 # ============================================================
 # MAIN TEST

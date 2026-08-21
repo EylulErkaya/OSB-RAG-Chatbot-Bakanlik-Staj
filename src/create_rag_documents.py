@@ -21,6 +21,8 @@ OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
 # --------------------------------------------------
 
 osb_df = pd.read_csv(OSB_PATH)
+DEPREM_COLUMN = "DEPREM\nBÖLGESİ"
+YATIRIM_COLUMN = "Yatırım Programı"
 sector_df = pd.read_csv(SECTOR_PATH)
 
 
@@ -66,6 +68,24 @@ def add_field(lines, label, value):
 
     if value is not None:
         lines.append(f"- {label}: {value}")
+        
+def normalize_flag(value):
+    """
+    Excel'deki + ve boş değerlerini anlamlı hale getirir.
+
+    +    -> Evet
+    boş  -> Hayır
+    """
+
+    if pd.isna(value):
+        return "Hayır"
+
+    value = str(value).strip()
+
+    if value == "+":
+        return "Evet"
+
+    return "Hayır"
 
 
 # --------------------------------------------------
@@ -99,6 +119,32 @@ for _, osb in osb_df.iterrows():
     add_field(lines, "Aşama", osb["Aşama"])
     add_field(lines, "Aşama detayı", osb["Aşama Detayı"])
     add_field(lines, "Sicil no", osb["Sicil No"])
+    
+    lines.append(
+    f"- Deprem Bölgesi: "
+    f"{normalize_flag(osb[DEPREM_COLUMN])}" 
+    )
+
+    lines.append(
+        f"- Yatırım Programı: "
+        f"{normalize_flag(osb[YATIRIM_COLUMN])}"
+    )
+    
+     # --------------------------------------------------
+    # KURULUŞ VE DURUM BİLGİLERİ
+    # --------------------------------------------------
+
+    lines.append("")
+    lines.append("Kuruluş ve Durum Bilgileri:")
+
+    establishment_fields = [
+        ("OSB kuruluş yılı", "OSB Kuruluş Yılı"),
+        ("OSB kuruluş tarihi", "OSB Kuruluş Tarihi"),
+        ("Yeni dizayn", "Yeni Dizayn"),
+    ]
+
+    for label, column in establishment_fields:
+        add_field(lines, label, osb[column])
 
     lines.append("")
     lines.append("Parsel Bilgileri:")
@@ -156,6 +202,24 @@ for _, osb in osb_df.iterrows():
     ]
 
     for label, column in parcel_fields:
+        add_field(lines, label, osb[column])
+        
+        lines.append("")
+    lines.append("Parsel Tipi Bilgileri:")
+
+    parcel_type_fields = [
+        ("A Tipi (3.000-5.000 m2)", "A Tipi (3.000-5.000 m2)"),
+        ("B Tipi (5.001-7.000 m2)", "B Tipi (5.001-.7000 m2)"),
+        ("C Tipi (7.001-10.000 m2)", "C Tipi (7.001-10.000 m2)"),
+        ("D Tipi (10.001-20.000 m2)", "D Tipi (10.001-20.000 m2)"),
+        ("E Tipi (20.001-30.000 m2)", "E Tipi (20.001-30.000 m2)"),
+        ("F Tipi (30.001-40.000 m2)", "F Tipi (30.001-40.000 m2)"),
+        ("G Tipi (40.001-50.000 m2)", "G Tipi (40.001-50.000 m2)"),
+        ("H Tipi (50.001-100.000 m2)", "H Tipi (50.001-100.000 m2)"),
+        ("I Tipi (100.001 m2 ve üzeri)", "I Tipi (100.001-   ..m2)"),
+    ]
+
+    for label, column in parcel_type_fields:
         add_field(lines, label, osb[column])
 
     lines.append("")
