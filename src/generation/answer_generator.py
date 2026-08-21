@@ -1,11 +1,5 @@
-import ollama
-
-
-# ============================================================
-# CONFIGURATION
-# ============================================================
-
-MODEL_NAME = "qwen3:4b-instruct"
+from .llm_providers.base import LLMProvider
+from .llm_providers.factory import get_provider
 
 
 # ============================================================
@@ -16,9 +10,13 @@ class AnswerGenerator:
 
     def __init__(
         self,
-        model_name: str = MODEL_NAME,
+        provider: LLMProvider | None = None,
     ):
-        self.model_name = model_name
+        self.provider = (
+            provider
+            if provider is not None
+            else get_provider()
+        )
 
     # ========================================================
     # GENERATE
@@ -35,34 +33,35 @@ class AnswerGenerator:
 
         if not prompt_result.get(
             "llm_allowed",
-            False
+            False,
         ):
 
             return {
                 "status": prompt_result.get(
                     "status",
-                    "blocked"
+                    "blocked",
                 ),
                 "answer": prompt_result.get(
-                    "message"
+                    "message",
+                    "LLM çağrılmadı.",
                 ),
-                "model": self.model_name,
+                "model": self.provider.model_name,
                 "llm_called": False,
             }
 
+        # ----------------------------------------------------
+        # PROMPT
+        # ----------------------------------------------------
+
         system_prompt = prompt_result.get(
             "system_prompt",
-            ""
+            "",
         )
 
         user_prompt = prompt_result.get(
             "user_prompt",
-            ""
+            "",
         )
-
-        # ----------------------------------------------------
-        # PROMPT KONTROLÜ
-        # ----------------------------------------------------
 
         if not system_prompt or not user_prompt:
 
@@ -72,42 +71,25 @@ class AnswerGenerator:
                     "LLM için geçerli bir prompt "
                     "oluşturulamadı."
                 ),
-                "model": self.model_name,
+                "model": self.provider.model_name,
                 "llm_called": False,
             }
 
         # ----------------------------------------------------
-        # OLLAMA
+        # LLM PROVIDER
         # ----------------------------------------------------
 
         try:
 
-            response = ollama.chat(
-                model=self.model_name,
-                messages=[
-                    {
-                        "role": "system",
-                        "content": system_prompt,
-                    },
-                    {
-                        "role": "user",
-                        "content": user_prompt,
-                    },
-                ],
-                options={
-                    "temperature": 0,
-                },
-            )
-
-            answer = (
-                response["message"]["content"]
-                .strip()
+            answer = self.provider.chat(
+                system_prompt=system_prompt,
+                user_prompt=user_prompt,
             )
 
             return {
                 "status": "success",
                 "answer": answer,
-                "model": self.model_name,
+                "model": self.provider.model_name,
                 "llm_called": True,
             }
 
@@ -119,7 +101,7 @@ class AnswerGenerator:
                     "Yanıt oluşturulurken "
                     "bir hata oluştu."
                 ),
-                "model": self.model_name,
+                "model": self.provider.model_name,
                 "llm_called": False,
                 "error": str(exc),
             }

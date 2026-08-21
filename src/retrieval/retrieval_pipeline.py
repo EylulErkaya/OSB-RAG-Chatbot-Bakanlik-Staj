@@ -422,7 +422,22 @@ def retrieve(
                         "requested_field": requested_field,
                         "resolved_common_value": common_value,
                         "candidates": candidates,
-                        "results": [],
+                        "results": [
+                            {
+                                "document": (
+                                    f"OSB: {osb_name}\n"
+                                    f"{requested_field}: {common_value}"
+                                ),
+                                "metadata": {
+                                    "osb_adi": osb_name,
+                                    "chunk_type": chunk_type,
+                                    "requested_field": requested_field,
+                                    "resolved_common_value": common_value,
+                                },
+                                "distance": None,
+                                "reranker_score": None,
+                            }
+                        ],
                     }
 
                 if comparison["status"] == "different":

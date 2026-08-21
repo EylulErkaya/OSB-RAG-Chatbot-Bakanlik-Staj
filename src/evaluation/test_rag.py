@@ -7,9 +7,9 @@ from src.generation.rag_pipeline import RAGPipeline
 
 TEST_CASES = [
 
-    # --------------------------------------------------------
+    # ========================================================
     # NORMAL RETRIEVAL
-    # --------------------------------------------------------
+    # ========================================================
 
     {
         "query": "Malatya-Güney OSB'de kaç boş parsel var?",
@@ -57,9 +57,9 @@ TEST_CASES = [
         ],
     },
 
-    # --------------------------------------------------------
+    # ========================================================
     # SECTOR
-    # --------------------------------------------------------
+    # ========================================================
 
     {
         "query": (
@@ -74,48 +74,16 @@ TEST_CASES = [
         ],
     },
 
-    # --------------------------------------------------------
-    # AMBIGUOUS
-    # --------------------------------------------------------
-
-    {
-        "query": "Malatya OSB'de kaç fabrika üretim yapıyor?",
-        "expected_status": "ambiguous",
-        "expected_intent": "employment",
-        "expected_osb_id": None,
-        "expected_llm_called": False,
-    },
-
-    {
-        "query": "Malatya OSB deprem bölgesinde mi?",
-        "expected_status": "ambiguous",
-        "expected_intent": "general",
-        "expected_osb_id": None,
-        "expected_llm_called": False,
-    },
-
-    # --------------------------------------------------------
-    # NOT FOUND
-    # --------------------------------------------------------
-
-    {
-        "query": "Olmayanşehir OSB'de kaç boş parsel var?",
-        "expected_status": "not_found",
-        "expected_intent": "parcel",
-        "expected_osb_id": None,
-        "expected_llm_called": False,
-    },
-    
-        # --------------------------------------------------------
+    # ========================================================
     # EK PARSEL TESTLERİ
-    # --------------------------------------------------------
+    # ========================================================
 
     {
         "query": "Malatya-Güney OSB'de boş parsel alanı kaç hektar?",
         "expected_status": "success",
         "expected_intent": "parcel",
         "expected_osb_id": 305,
-        "expected_answer_contains": ["193.86"],
+        "expected_answer_contains": ["193,86"],
     },
 
     {
@@ -134,9 +102,9 @@ TEST_CASES = [
         "expected_answer_contains": ["15"],
     },
 
-    # --------------------------------------------------------
+    # ========================================================
     # EK İSTİHDAM TESTLERİ
-    # --------------------------------------------------------
+    # ========================================================
 
     {
         "query": "Malatya-Güney OSB'de üretimdeki toplam istihdam kaç?",
@@ -154,9 +122,9 @@ TEST_CASES = [
         "expected_answer_contains": ["21"],
     },
 
-    # --------------------------------------------------------
+    # ========================================================
     # GENEL BİLGİ
-    # --------------------------------------------------------
+    # ========================================================
 
     {
         "query": "Malatya-Güney OSB hangi ilde?",
@@ -187,12 +155,15 @@ TEST_CASES = [
         "expected_status": "success",
         "expected_intent": "general",
         "expected_osb_id": 305,
-        "expected_answer_contains": ["5", "teşvik bölgesinde", ],
+        "expected_answer_contains": [
+            "5",
+            "teşvik bölgesinde",
+        ],
     },
 
-    # --------------------------------------------------------
+    # ========================================================
     # SEKTÖR
-    # --------------------------------------------------------
+    # ========================================================
 
     {
         "query": "Malatya-Güney OSB'de hangi sektör bulunuyor?",
@@ -200,7 +171,7 @@ TEST_CASES = [
         "expected_intent": "sector",
         "expected_osb_id": 305,
         "expected_answer_contains": [
-            "GIDA ÜRÜNLERİ İMALATI"
+            "GIDA ÜRÜNLERİ İMALATI",
         ],
     },
 
@@ -210,13 +181,29 @@ TEST_CASES = [
         "expected_intent": "sector",
         "expected_osb_id": 305,
         "expected_answer_contains": [
-            "GIDA ÜRÜNLERİ İMALATI"
+            "GIDA ÜRÜNLERİ İMALATI",
         ],
     },
 
-    # --------------------------------------------------------
+    # ========================================================
     # AMBIGUOUS
-    # --------------------------------------------------------
+    # ========================================================
+
+    {
+        "query": "Malatya OSB'de kaç fabrika üretim yapıyor?",
+        "expected_status": "ambiguous",
+        "expected_intent": "employment",
+        "expected_osb_id": None,
+        "expected_llm_called": False,
+    },
+
+    {
+        "query": "Malatya OSB deprem bölgesinde mi?",
+        "expected_status": "ambiguous",
+        "expected_intent": "general",
+        "expected_osb_id": None,
+        "expected_llm_called": False,
+    },
 
     {
         "query": "Malatya OSB'de kaç boş parsel var?",
@@ -228,15 +215,23 @@ TEST_CASES = [
 
     {
         "query": "Malatya OSB hangi bölgede?",
-        "expected_status": "ambiguous",
+        "expected_status": "success",
         "expected_intent": "general",
+        "expected_osb_id": None,
+        "expected_answer_contains": ["Doğu Anadolu",],
+    },
+
+    # ========================================================
+    # NOT FOUND
+    # ========================================================
+
+    {
+        "query": "Olmayanşehir OSB'de kaç boş parsel var?",
+        "expected_status": "not_found",
+        "expected_intent": "parcel",
         "expected_osb_id": None,
         "expected_llm_called": False,
     },
-
-    # --------------------------------------------------------
-    # NOT FOUND
-    # --------------------------------------------------------
 
     {
         "query": "Hayalşehir OSB'de kaç fabrika var?",
@@ -255,7 +250,7 @@ TEST_CASES = [
 
 
 # ============================================================
-# TEST RUNNER
+# NORMAL TEST RUNNER
 # ============================================================
 
 def run_test(
@@ -289,8 +284,13 @@ def run_test(
     # INTENT
     # --------------------------------------------------------
 
-    actual_intent = retrieval.get("intent")
-    expected_intent = test_case.get("expected_intent")
+    expected_intent = test_case.get(
+        "expected_intent"
+    )
+
+    actual_intent = retrieval.get(
+        "intent"
+    )
 
     if (
         expected_intent is not None
@@ -305,8 +305,13 @@ def run_test(
     # OSB ID
     # --------------------------------------------------------
 
-    actual_osb_id = retrieval.get("osb_id")
-    expected_osb_id = test_case.get("expected_osb_id")
+    expected_osb_id = test_case.get(
+        "expected_osb_id"
+    )
+
+    actual_osb_id = retrieval.get(
+        "osb_id"
+    )
 
     if actual_osb_id != expected_osb_id:
         errors.append(
@@ -324,13 +329,15 @@ def run_test(
             "llm_called"
         )
 
-        if (
-            actual_llm_called
-            != test_case["expected_llm_called"]
-        ):
+        expected_llm_called = test_case[
+            "expected_llm_called"
+        ]
+
+        if actual_llm_called != expected_llm_called:
+
             errors.append(
                 "llm_called "
-                f"beklenen={test_case['expected_llm_called']}, "
+                f"beklenen={expected_llm_called}, "
                 f"gerçek={actual_llm_called}"
             )
 
@@ -342,6 +349,10 @@ def run_test(
         "expected_answer_contains",
         [],
     )
+    
+    print(
+        f"  Gerçek cevap: {answer_result.get('answer', '')}"
+    )
 
     answer = answer_result.get(
         "answer",
@@ -350,14 +361,190 @@ def run_test(
 
     for expected_string in expected_strings:
 
-        if expected_string.lower() not in answer.lower():
+        if (
+            expected_string.lower()
+            not in answer.lower()
+        ):
 
             errors.append(
                 f"cevap içinde '{expected_string}' "
                 "bulunamadı"
             )
 
-    return len(errors) == 0, errors
+    return (
+        len(errors) == 0,
+        errors,
+    )
+
+
+# ============================================================
+# AMBIGUOUS SELECTION TEST
+# ============================================================
+
+def test_ambiguous_selection() -> tuple[bool, list[str]]:
+
+    errors = []
+
+    pipeline = RAGPipeline()
+
+    # --------------------------------------------------------
+    # 1. Ambiguous soru
+    # --------------------------------------------------------
+
+    result = pipeline.ask(
+        "Malatya OSB'de kaç fabrika üretim yapıyor?"
+    )
+
+    retrieval = result["retrieval"]
+
+    if retrieval.get("status") != "ambiguous":
+        errors.append(
+            "İlk soru ambiguous dönmedi."
+        )
+
+        return False, errors
+
+    if not pipeline.pending_query:
+        errors.append(
+            "pending_query oluşturulmadı."
+        )
+
+    if not pipeline.pending_candidates:
+        errors.append(
+            "pending_candidates oluşturulmadı."
+        )
+
+    # --------------------------------------------------------
+    # 2. Kullanıcı 1'i seçiyor
+    # --------------------------------------------------------
+
+    selection_result = pipeline.ask("1")
+
+    selection_retrieval = (
+        selection_result["retrieval"]
+    )
+
+    if selection_retrieval.get("status") != "success":
+        errors.append(
+            "Numaralı seçim sonrası "
+            "retrieval success olmadı."
+        )
+
+    selected_osb = selection_result.get(
+        "selected_osb"
+    )
+
+    if not selected_osb:
+        errors.append(
+            "selected_osb bulunamadı."
+        )
+
+    else:
+
+        if (
+            selection_retrieval.get("osb_id")
+            != selected_osb.get("id")
+        ):
+            errors.append(
+                "Seçilen OSB ID ile retrieval "
+                "OSB ID eşleşmiyor."
+            )
+
+        if (
+            selection_retrieval.get("osb_name")
+            != selected_osb.get("name")
+        ):
+            errors.append(
+                "Seçilen OSB adı ile retrieval "
+                "OSB adı eşleşmiyor."
+            )
+
+    # --------------------------------------------------------
+    # 3. State temizliği
+    # --------------------------------------------------------
+
+    if pipeline.pending_query is not None:
+        errors.append(
+            "Seçim sonrasında pending_query "
+            "temizlenmedi."
+        )
+
+    if pipeline.pending_candidates:
+        errors.append(
+            "Seçim sonrasında pending_candidates "
+            "temizlenmedi."
+        )
+
+    return (
+        len(errors) == 0,
+        errors,
+    )
+
+
+# ============================================================
+# INVALID SELECTION TEST
+# ============================================================
+
+def test_invalid_selection() -> tuple[bool, list[str]]:
+
+    errors = []
+
+    pipeline = RAGPipeline()
+
+    # Önce ambiguous state oluştur
+    result = pipeline.ask(
+        "Malatya OSB'de kaç fabrika üretim yapıyor?"
+    )
+
+    if result["retrieval"].get(
+        "status"
+    ) != "ambiguous":
+
+        errors.append(
+            "Invalid selection testi için "
+            "ambiguous state oluşturulamadı."
+        )
+
+        return False, errors
+
+    # Geçersiz seçim
+    invalid_result = pipeline.ask("99")
+
+    retrieval = invalid_result["retrieval"]
+
+    if retrieval.get(
+        "status"
+    ) != "selection_error":
+
+        errors.append(
+            "Geçersiz seçim "
+            "selection_error döndürmedi."
+        )
+
+    if invalid_result["answer"].get(
+        "llm_called"
+    ):
+        errors.append(
+            "Geçersiz seçimde LLM çağrıldı."
+        )
+
+    # State korunmalı
+    if not pipeline.pending_query:
+        errors.append(
+            "Geçersiz seçimden sonra "
+            "pending_query kayboldu."
+        )
+
+    if not pipeline.pending_candidates:
+        errors.append(
+            "Geçersiz seçimden sonra "
+            "pending_candidates kayboldu."
+        )
+
+    return (
+        len(errors) == 0,
+        errors,
+    )
 
 
 # ============================================================
@@ -370,18 +557,21 @@ def main():
     print("RAG EVALUATION")
     print("=" * 70)
 
-    pipeline = RAGPipeline()
-
     total = len(TEST_CASES)
     passed = 0
     failed = 0
 
-    results = []
+    # --------------------------------------------------------
+    # NORMAL TESTLER
+    # --------------------------------------------------------
 
     for index, test_case in enumerate(
         TEST_CASES,
         start=1,
     ):
+
+        # Her test bağımsız pipeline
+        pipeline = RAGPipeline()
 
         query = test_case["query"]
 
@@ -397,58 +587,85 @@ def main():
         if success:
 
             passed += 1
-
             print("SONUÇ: ✅ PASS")
 
         else:
 
             failed += 1
-
             print("SONUÇ: ❌ FAIL")
 
             for error in errors:
                 print(f"  - {error}")
 
-        results.append(
-            {
-                "query": query,
-                "passed": success,
-                "errors": errors,
-            }
-        )
-
     # --------------------------------------------------------
-    # SUMMARY
+    # AMBIGUOUS SELECTION
     # --------------------------------------------------------
 
-    accuracy = (
-        passed / total * 100
-        if total
-        else 0
-    )
+    print("\n" + "-" * 70)
+    print("AMBIGUOUS SELECTION TEST")
+
+    success, errors = test_ambiguous_selection()
+
+    if success:
+
+        passed += 1
+        print("SONUÇ: ✅ PASS")
+
+    else:
+
+        failed += 1
+        print("SONUÇ: ❌ FAIL")
+
+        for error in errors:
+            print(f"  - {error}")
+
+    # --------------------------------------------------------
+    # INVALID SELECTION
+    # --------------------------------------------------------
+
+    print("\n" + "-" * 70)
+    print("INVALID SELECTION TEST")
+
+    success, errors = test_invalid_selection()
+
+    if success:
+
+        passed += 1
+        print("SONUÇ: ✅ PASS")
+
+    else:
+
+        failed += 1
+        print("SONUÇ: ❌ FAIL")
+
+        for error in errors:
+            print(f"  - {error}")
+
+    # --------------------------------------------------------
+    # FINAL SUMMARY
+    # --------------------------------------------------------
+
+    total_tests = passed + failed
 
     print("\n" + "=" * 70)
-    print("EVALUATION SONUCU")
+    print("TEST SONUÇLARI")
     print("=" * 70)
 
-    print(f"Toplam test : {total}")
+    print(f"Toplam test : {total_tests}")
     print(f"Başarılı    : {passed}")
     print(f"Başarısız   : {failed}")
-    print(f"Başarı oranı: %{accuracy:.2f}")
-
-    print("=" * 70)
 
     if failed == 0:
 
-        print(
-            "🎉 TÜM RAG TESTLERİ BAŞARILI!"
-        )
+        print("\n🎉 TÜM RAG TESTLERİ BAŞARILI!")
 
     else:
 
         print(
-            "⚠️ Bazı testler başarısız."
+            "\n⚠️ Bazı RAG testleri başarısız."
         )
+
+        raise SystemExit(1)
 
 
 if __name__ == "__main__":
