@@ -2,6 +2,7 @@ import os
 
 from .base import LLMProvider
 from .gemini_provider import GeminiProvider
+from .groq_provider import GroqProvider
 from .ollama_provider import OllamaProvider
 
 
@@ -23,7 +24,19 @@ def get_provider() -> LLMProvider:
                 "GEMINI_API_KEY"
             ),
         )
+        
+        
+    if provider_name == "groq":
 
+        return GroqProvider(
+            model=os.getenv(
+                "GROQ_MODEL",
+                "llama-3.1-8b-instant",
+            ),
+            api_key=os.getenv(
+                "GROQ_API_KEY"
+            ),
+        )
     if provider_name == "ollama":
 
         return OllamaProvider(
