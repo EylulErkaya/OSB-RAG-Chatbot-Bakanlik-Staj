@@ -48,73 +48,104 @@ class RAGPipeline:
             )
 
             # ------------------------------------------------
-            # SEÇİM BAŞARILI
-            # ------------------------------------------------
-
-            if selection_result["status"] == "selected":
-
-                original_query = self.pending_query
-
-                selected_candidate = (
-                    selection_result["candidate"]
-                )
-
-                selected_osb_id = (
-                    selected_candidate["id"]
-                )
-
-                selected_osb_name = (
-                    selected_candidate["name"]
-                )
-
-                # State temizle
-                self._clear_pending_state()
-
-                # ------------------------------------------------
-                # SEÇİLEN OSB İLE ORİJİNAL SORUYU TEKRAR ÇALIŞTIR
-                # ------------------------------------------------
-
-                retrieval_result = retrieve(
-                    query=original_query,
-                    selected_osb_id=selected_osb_id,
-                    selected_osb_name=selected_osb_name,
-                )
-
-                return self._build_pipeline_result(
-                    query=query,
-                    retrieval_result=retrieval_result,
-                    selected_osb=selected_candidate,
-                    original_query=original_query,
-                )
-
-            # ------------------------------------------------
             # GEÇERSİZ SEÇİM
             # ------------------------------------------------
 
-            return {
-                "query": query,
-                "retrieval": {
-                    "status": "selection_error",
-                    "candidates": self.pending_candidates,
-                },
-                "context": {
-                    "status": "selection_error",
-                    "llm_allowed": False,
-                },
-                "prompt": {
-                    "status": "selection_error",
-                    "llm_allowed": False,
-                },
-                "answer": {
-                    "status": "selection_error",
-                    "answer": (
-                        "Geçersiz seçim. "
-                        "Lütfen listede gösterilen "
-                        "numaralardan birini yazın."
-                    ),
-                    "llm_called": False,
-                },
-            }
+            if selection_result["status"] == "invalid":
+
+                return {
+                    "query": query,
+                    "retrieval": {
+                        "status": "selection_error",
+                        "candidates": self.pending_candidates,
+                    },
+                    "context": {
+                        "status": "selection_error",
+                        "llm_allowed": False,
+                    },
+                    "prompt": {
+                        "status": "selection_error",
+                        "llm_allowed": False,
+                    },
+                    "answer": {
+                        "status": "selection_error",
+                        "answer": (
+                            "Geçersiz seçim. "
+                            "Lütfen listede gösterilen "
+                            "numaralardan birini yazın."
+                        ),
+                        "llm_called": False,
+                    },
+                }
+
+            # ------------------------------------------------
+            # ------------------------------------------------
+            # SEÇİM BAŞARILI
+            # ------------------------------------------------
+
+            selected_osb = selection_result["candidate"]
+
+            original_query = self.pending_query
+
+            if not original_query:
+                return {
+                    "query": query,
+                    "retrieval": {
+                        "status": "selection_error",
+                    },
+                    "context": {
+                        "status": "selection_error",
+                        "llm_allowed": False,
+                    },
+                    "prompt": {
+                        "status": "selection_error",
+                        "llm_allowed": False,
+                    },
+                    "answer": {
+                        "status": "selection_error",
+                        "answer": "Bekleyen soru bulunamadı.",
+                        "llm_called": False,
+                    },
+                }
+
+            retrieval_result = retrieve(
+                query=original_query,
+                selected_osb_id=selected_osb["id"],
+                selected_osb_name=selected_osb["name"],
+            )
+
+            result = self._build_pipeline_result(
+                query=original_query,
+                retrieval_result=retrieval_result,
+                selected_osb=selected_osb,
+                original_query=original_query,
+            )
+
+            # Retrieval ve cevap başarıyla oluşturulduktan sonra state temizle
+            self._clear_pending_state()
+
+            return result
+
+            # ------------------------------------------------
+            # SEÇİLEN OSB İLE RETRIEVAL
+            # ------------------------------------------------
+
+            retrieval_result = retrieve(
+                query=original_query,
+                selected_osb_id=selected_osb["id"],
+                selected_osb_name=selected_osb["name"],
+            )
+
+            # ------------------------------------------------
+            # NORMAL PIPELINE'A DEVAM
+            # ------------------------------------------------
+
+            return self._build_pipeline_result(
+                query=query,
+                retrieval_result=retrieval_result,
+                selected_osb=selected_osb,
+                original_query=original_query,
+            )
 
         # ====================================================
         # 2. NORMAL RETRIEVAL
@@ -140,14 +171,13 @@ class RAGPipeline:
             )
 
         # ====================================================
-        # 4. PIPELINE
+        # 4. NORMAL PIPELINE
         # ====================================================
 
         return self._build_pipeline_result(
             query=query,
             retrieval_result=retrieval_result,
         )
-
     # ========================================================
     # SELECTION HANDLER
     # ========================================================
