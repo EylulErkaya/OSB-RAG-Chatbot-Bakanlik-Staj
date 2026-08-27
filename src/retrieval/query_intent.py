@@ -50,6 +50,19 @@ INTENT_RULES = {
         "yatırım",
         "yatırım programı",
     ],
+    
+    "listing": [
+        "listele",
+        "listesi",
+        "liste",
+        "göster",
+        "gösterir misin",
+        "hangileri",
+        "hangi osb'ler",
+        "hangi osbler",
+        "osb'ler",
+        "osbler",
+    ],
 }
 
 
@@ -230,6 +243,16 @@ if __name__ == "__main__":
         "Malatya-Güney OSB'de gıda sektöründe kaç kişi çalışıyor?",
 
         "Malatya-Güney OSB'nin sicil numarası nedir?",
+        
+        "Malatya'daki OSB'leri listele",
+
+        "Malatya'daki OSB'leri göster",
+
+        "Türkiye'deki OSB'leri listele",
+
+        "Hangi OSB'ler var?",
+
+        "Malatya OSB listesi",
     ]
 
 

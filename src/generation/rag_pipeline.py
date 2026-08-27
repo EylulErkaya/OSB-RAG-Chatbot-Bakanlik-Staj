@@ -25,6 +25,7 @@ class RAGPipeline:
 
         self.pending_query: str | None = None
         self.pending_candidates: list[dict[str, Any]] = []
+        self.pending_listing: dict[str, Any] | None = None
 
     # ========================================================
     # ASK
@@ -38,7 +39,18 @@ class RAGPipeline:
         query = query.strip()
 
         # ====================================================
-        # 1. BEKLEYEN AMBIGUOUS SEÇİM VAR MI?
+        # 1. BEKLEYEN LISTING İÇİN DEVAM İSTEĞİ
+        # ====================================================
+
+        if (
+            self.pending_listing
+            and query.lower() == "devam"
+        ):
+
+            return self._handle_listing_continue()
+
+        # ====================================================
+        # 2. BEKLEYEN AMBIGUOUS SEÇİM VAR MI?
         # ====================================================
 
         if self.pending_candidates:
@@ -169,6 +181,32 @@ class RAGPipeline:
                     []
                 )
             )
+            
+        # ====================================================
+        # 4. LISTING STATE KAYDET
+        # ====================================================
+
+        if retrieval_result.get("status") == "listing":
+
+            self.pending_listing = {
+                "query": query,
+                "filters": retrieval_result.get(
+                    "filters",
+                    {}
+                ),
+                "offset": retrieval_result.get(
+                    "offset",
+                    0
+                ),
+                "limit": retrieval_result.get(
+                    "limit",
+                    10
+                ),
+                "total_count": retrieval_result.get(
+                    "total_count",
+                    0
+                ),
+            }
 
         # ====================================================
         # 4. NORMAL PIPELINE
@@ -178,6 +216,70 @@ class RAGPipeline:
             query=query,
             retrieval_result=retrieval_result,
         )
+
+    # ========================================================
+    # LISTING CONTINUE HANDLER
+    # ========================================================
+
+    def _handle_listing_continue(self) -> dict[str, Any]:
+
+        listing_state = self.pending_listing
+
+        if not listing_state:
+            raise RuntimeError("Bekleyen listeleme durumu bulunamadı.")
+
+        old_offset = listing_state.get("offset", 0)
+        limit = listing_state.get("limit", 10)
+        total_count = listing_state.get("total_count", 0)
+        new_offset = old_offset + limit
+
+        if new_offset >= total_count:
+
+            self.pending_listing = None
+
+            return {
+                "query": "devam",
+                "retrieval": {
+                    "status": "listing_end",
+                },
+                "context": {
+                    "status": "listing_end",
+                    "llm_allowed": False,
+                },
+                "prompt": {
+                    "status": "listing_end",
+                    "llm_allowed": False,
+                },
+                "answer": {
+                    "status": "listing_end",
+                    "answer": "Başka kayıt bulunmamaktadır.",
+                    "llm_called": False,
+                },
+            }
+
+        retrieval_result = retrieve(
+            query=listing_state["query"],
+            offset=new_offset,
+            limit=limit,
+            listing_filters=listing_state.get("filters"),
+        )
+
+        self.pending_listing = {
+            "query": listing_state["query"],
+            "filters": retrieval_result.get("filters", {}),
+            "offset": retrieval_result.get("offset", new_offset),
+            "limit": retrieval_result.get("limit", limit),
+            "total_count": retrieval_result.get(
+                "total_count",
+                total_count,
+            ),
+        }
+
+        return self._build_pipeline_result(
+            query=listing_state["query"],
+            retrieval_result=retrieval_result,
+        )
+
     # ========================================================
     # SELECTION HANDLER
     # ========================================================
@@ -578,6 +680,16 @@ TEST_QUERIES = [
     "Malatya OSB deprem bölgesinde mi?",
 
     "Olmayanşehir OSB'de kaç boş parsel var?",
+    
+    "Malatya'daki OSB'leri listele",
+    
+    "Doğu Anadolu'daki OSB'leri listele",
+    
+    "Türkiye'deki OSB'leri listele",
+    
+    "Malatya'daki Karma OSB'leri listele",
+    
+    "Karma OSB'leri listele",
 ]
 
 

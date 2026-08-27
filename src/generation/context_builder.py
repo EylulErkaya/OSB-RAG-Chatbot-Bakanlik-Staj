@@ -21,7 +21,7 @@ class ContextBuilder:
     def build(self, retrieval_result: dict[str, Any]) -> dict[str, Any]:
 
         status = retrieval_result.get("status")
-
+        
         # ====================================================
         # AMBIGUOUS
         # ====================================================
@@ -57,6 +57,17 @@ class ContextBuilder:
                     "bulunamadı."
                 ),
             }
+            
+            
+        # ====================================================
+        # LISTING
+        # ====================================================
+
+        if status == "listing":
+
+            return self._build_listing_context(
+                retrieval_result
+            )
 
         # ====================================================
         # BEKLENMEYEN DURUM
@@ -471,4 +482,143 @@ class ContextBuilder:
             "arasında bir seçim yapın."
         )
 
-        return "\n".join(lines)  
+        return "\n".join(lines)
+    
+        # ========================================================
+    # LISTING CONTEXT
+    # ========================================================
+
+    def _build_listing_context(
+        self,
+        retrieval_result: dict[str, Any],
+    ) -> dict[str, Any]:
+
+        results = retrieval_result.get(
+            "results",
+            []
+        )
+
+        total_count = retrieval_result.get(
+            "total_count",
+            0
+        )
+
+        limit = retrieval_result.get(
+            "limit",
+            10
+        )
+
+        offset = retrieval_result.get(
+            "offset",
+            0
+        )
+
+        returned_count = retrieval_result.get(
+            "returned_count",
+            len(results)
+        )
+
+        # ====================================================
+        # SONUÇ YOK
+        # ====================================================
+
+        if not results:
+
+            return {
+                "status": "listing",
+                "context": "",
+                "llm_allowed": False,
+                "message": (
+                    "Belirtilen filtrelere uygun "
+                    "OSB bulunamadı."
+                ),
+                "total_count": total_count,
+                "limit": limit,
+                "offset": offset,
+                "returned_count": returned_count,
+            }
+
+        # ====================================================
+        # LISTING CONTEXT
+        # ====================================================
+
+        context_blocks = []
+
+        for index, result in enumerate(
+            results,
+            start=offset + 1
+        ):
+
+            name = result.get(
+                "name",
+                "Bilinmeyen OSB"
+            )
+
+            city = result.get("city")
+            district = result.get("district")
+            region = result.get("region")
+            osb_type = result.get("type")
+            stage = result.get("stage")
+
+            lines = [
+                f"[OSB {index}]",
+                f"OSB: {name}",
+            ]
+
+            if city:
+                lines.append(
+                    f"İl: {city}"
+                )
+
+            if district:
+                lines.append(
+                    f"İlçe: {district}"
+                )
+
+            if region:
+                lines.append(
+                    f"Bölge: {region}"
+                )
+
+            if osb_type:
+                lines.append(
+                    f"OSB Türü: {osb_type}"
+                )
+
+            if stage:
+                lines.append(
+                    f"Aşama: {stage}"
+                )
+
+            context_blocks.append(
+                "\n".join(lines)
+            )
+
+        # ====================================================
+        # PAGINATION BİLGİSİ
+        # ====================================================
+
+        pagination_info = (
+            f"Toplam OSB sayısı: {total_count}\n"
+            f"Bu yanıtta gösterilen kayıt sayısı: "
+            f"{returned_count}\n"
+            f"Başlangıç konumu: {offset}\n"
+            f"Sayfa limiti: {limit}"
+        )
+
+        context = (
+            pagination_info
+            + "\n\n"
+            + "\n\n".join(context_blocks)
+        )
+
+        return {
+            "status": "listing",
+            "context": context,
+            "llm_allowed": True,
+            "message": None,
+            "total_count": total_count,
+            "limit": limit,
+            "offset": offset,
+            "returned_count": returned_count,
+        }

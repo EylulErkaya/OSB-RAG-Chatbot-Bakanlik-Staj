@@ -191,11 +191,12 @@ def select_conversation_candidate(
         print(conversation.pending_query)
 
         rag_service = RAGService()
+        rag_service.restore_pending_state(
+            conversation.pending_query,
+            candidates,
+        )
 
-        rag_service.pipeline.pending_query = conversation.pending_query
-        rag_service.pipeline.pending_candidates = candidates
-
-        result = rag_service.pipeline.ask(
+        result = rag_service.select(
             str(data.selection)
         )
 
@@ -210,7 +211,7 @@ def select_conversation_candidate(
         user_message = Message(
             conversation_id=conversation.id,
             role="user",
-            content=conversation.pending_query,
+            content=str(data.selection),
         )
 
         assistant_message = Message(

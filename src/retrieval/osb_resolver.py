@@ -210,7 +210,239 @@ def compare_candidate_field(
         "status": "different",
         "values": values
     }
+    
+    
+def list_osbs(
+    city: str | None = None,
+    district: str | None = None,
+    region: str | None = None,
+    osb_type: str | None = None,
+    stage: str | None = None,
+    investment_program: str | None = None,
+    earthquake_region: str | None = None,
+    incentive_region: str | None = None,
+    limit: int = 10,
+    offset: int = 0,
+):
+    """
+    OSB kayıtlarını filtreleyerek listeler.
 
+    Desteklenen filtreler:
+
+        city
+        district
+        region
+        osb_type
+        stage
+        investment_program
+        earthquake_region
+        incentive_region
+
+    Ayrıca pagination destekler.
+    """
+
+    filtered = osb_df.copy()
+
+    # ========================================================
+    # ŞEHİR
+    # ========================================================
+
+    if city:
+
+        value = normalize_text(city)
+
+        filtered = filtered[
+            filtered["İl Adı"]
+            .astype(str)
+            .str.strip()
+            .str.lower()
+            == value
+        ]
+
+    # ========================================================
+    # İLÇE
+    # ========================================================
+
+    if district:
+
+        value = normalize_text(district)
+
+        filtered = filtered[
+            filtered["İlçe"]
+            .astype(str)
+            .str.strip()
+            .str.lower()
+            == value
+        ]
+
+    # ========================================================
+    # BÖLGE
+    # ========================================================
+
+    if region:
+
+        value = normalize_text(region)
+
+        filtered = filtered[
+            filtered["Bölge"]
+            .astype(str)
+            .str.strip()
+            .str.lower()
+            == value
+        ]
+
+    # ========================================================
+    # OSB TÜRÜ
+    # ========================================================
+
+    if osb_type:
+
+        value = normalize_text(osb_type)
+
+        filtered = filtered[
+            filtered["OSB Türü"]
+            .astype(str)
+            .str.strip()
+            .str.lower()
+            == value
+        ]
+
+    # ========================================================
+    # AŞAMA
+    # ========================================================
+
+    if stage:
+
+        value = normalize_text(stage)
+
+        filtered = filtered[
+            filtered["Aşama"]
+            .astype(str)
+            .str.strip()
+            .str.lower()
+            .str.contains(
+                value,
+                na=False
+            )
+        ]
+
+    # ========================================================
+    # YATIRIM PROGRAMI
+    # ========================================================
+
+    if investment_program:
+
+        column = "Yatırım Programı"
+
+        def normalize_investment(value):
+
+            if pd.isna(value):
+                return "Hayır"
+
+            value = str(value).strip()
+
+            if value == "+":
+                return "Evet"
+
+            return "Hayır"
+
+        filtered = filtered[
+            filtered[column]
+            .apply(normalize_investment)
+            == investment_program
+        ]
+
+    # ========================================================
+    # DEPREM BÖLGESİ
+    # ========================================================
+
+    if earthquake_region:
+
+        column = "DEPREM\nBÖLGESİ"
+
+        def normalize_earthquake(value):
+
+            if pd.isna(value):
+                return "Hayır"
+
+            value = str(value).strip()
+
+            if value == "+":
+                return "Evet"
+
+            return "Hayır"
+
+        filtered = filtered[
+            filtered[column]
+            .apply(normalize_earthquake)
+            == earthquake_region
+        ]
+
+    # ========================================================
+    # TEŞVİK BÖLGESİ
+    # ========================================================
+
+    if incentive_region:
+
+        value = normalize_text(
+            incentive_region
+        )
+
+        filtered = filtered[
+            filtered[
+                "Teşvik Bölgelerine Göre İller"
+            ]
+            .astype(str)
+            .str.strip()
+            .str.lower()
+            .str.contains(
+                value,
+                na=False
+            )
+        ]
+
+    # ========================================================
+    # TÜM SONUÇLAR
+    # ========================================================
+
+    results = []
+
+    for _, row in filtered.iterrows():
+
+        results.append({
+            "id": int(row["ID"]),
+            "name": str(row["OSB Adı"]),
+            "city": str(row["İl Adı"]),
+            "district": str(row["İlçe"]),
+            "region": str(row["Bölge"]),
+            "type": str(row["OSB Türü"]),
+            "stage": str(row["Aşama"]),
+        })
+
+    # ========================================================
+    # TOTAL
+    # ========================================================
+
+    total_count = len(results)
+
+    # ========================================================
+    # PAGINATION
+    # ========================================================
+
+    paginated_results = results[
+        offset:offset + limit
+    ]
+
+    return {
+        "status": "success",
+        "total_count": total_count,
+        "limit": limit,
+        "offset": offset,
+        "returned_count": len(
+            paginated_results
+        ),
+        "results": paginated_results,
+    }
 
 
 
@@ -219,6 +451,55 @@ def compare_candidate_field(
 # ============================================================
 
 if __name__ == "__main__":
+    
+    print("\n" + "=" * 70)
+    print("OSB LİSTELEME TESTİ")
+    print("=" * 70)
+
+    tests = [
+        {
+            "name": "Malatya OSB'leri",
+            "city": "Malatya",
+        },
+        {
+            "name": "Doğu Anadolu OSB'leri",
+            "region": "Doğu Anadolu",
+        },
+        {
+            "name": "Tüm OSB'ler",
+        },
+    ]
+
+    for test in tests:
+
+        print("\n" + "-" * 70)
+        print(
+            f"TEST: {test['name']}"
+        )
+
+        result = list_osbs(
+            city=test.get("city"),
+            region=test.get("region"),
+            osb_type=test.get("osb_type"),
+            limit=10,
+            offset=0,
+        )
+
+        print(
+            f"Toplam kayıt: "
+            f"{result['total_count']}"
+        )
+
+        for item in result["results"]:
+
+            print(
+                f"{item['id']} | "
+                f"{item['name']} | "
+                f"{item['city']} | "
+                f"{item['district']} | "
+                f"{item['region']} | "
+                f"{item['type']}"
+            )
 
     tests = [
         ("Malatya OSB", "Malatya"),
@@ -270,3 +551,72 @@ if __name__ == "__main__":
                     f"{candidate['name']} | "
                     f"{candidate['district']}"
                 )
+                
+    print("\n" + "=" * 70)
+    print("PAGINATION TESTİ")
+    print("=" * 70)
+
+    result = list_osbs(
+        limit=10,
+        offset=0,
+    )
+
+    print(
+        f"Toplam kayıt    : {result['total_count']}"
+    )
+
+    print(
+        f"Offset          : {result['offset']}"
+    )
+
+    print(
+        f"Limit           : {result['limit']}"
+    )
+
+    print(
+        f"Dönen kayıt     : {result['returned_count']}"
+    )
+
+    print("\nİlk 10 kayıt:")
+
+    for item in result["results"]:
+
+        print(
+            f"{item['id']} | "
+            f"{item['name']} | "
+            f"{item['city']}"
+        )
+
+
+    print("\n" + "-" * 70)
+
+    result = list_osbs(
+        limit=10,
+        offset=10,
+    )
+
+    print(
+        f"Toplam kayıt    : {result['total_count']}"
+    )
+
+    print(
+        f"Offset          : {result['offset']}"
+    )
+
+    print(
+        f"Limit           : {result['limit']}"
+    )
+
+    print(
+        f"Dönen kayıt     : {result['returned_count']}"
+    )
+
+    print("\n11-20 arasındaki kayıtlar:")
+
+    for item in result["results"]:
+
+        print(
+            f"{item['id']} | "
+            f"{item['name']} | "
+            f"{item['city']}"
+        )

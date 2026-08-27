@@ -16,8 +16,14 @@ class RAGService:
         query: str,
         candidates: list[dict[str, Any]],
     ):
-        self.pending_query = query
-        self.pending_candidates = candidates
+        self.pipeline.pending_query = query
+        self.pipeline.pending_candidates = candidates
+        
+    def restore_pending_listing(
+        self,
+        listing_state: dict[str, Any],
+    ):
+        self.pipeline.pending_listing = listing_state
 
     def ask(self, query: str) -> dict[str, Any]:
         """

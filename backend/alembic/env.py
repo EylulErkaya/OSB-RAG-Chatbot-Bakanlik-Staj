@@ -24,8 +24,8 @@ sys.path.insert(
 # UYGULAMA MODELLERİ
 # ============================================================
 
-from app.db.base import Base
-from app.models import Conversation, Message
+from backend.app.db.base import Base
+from backend.app.models import Conversation, Message
 
 
 # ============================================================

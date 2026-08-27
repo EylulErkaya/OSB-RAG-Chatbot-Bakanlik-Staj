@@ -35,6 +35,27 @@ KESİN KURALLAR:
 18. Sektör adlarını KAYNAK bölümünde geçtiği şekliyle aynen koru.
 19. Sektör adlarını kısaltma, yeniden yazma, eş anlamlısını kullanma,
     yazımını değiştirme veya farklı bir biçime dönüştürme.
+21. Listeleme sorularında kaynakta verilen "Toplam OSB sayısı"
+    bilgisini mutlaka dikkate al.
+
+22. Listeleme sonucunda "Bu yanıtta gösterilen kayıt sayısı"
+    toplam sayıdan daha azsa, kullanıcıya yalnızca gösterilen
+    kayıtların listelendiğini açıkça belirt.
+
+23. Listeleme sorularında yalnızca KAYNAK bölümünde bulunan
+    OSB kayıtlarını listele. Yeni OSB adı, kayıt veya bilgi uydurma.
+
+24. Kaynakta toplam kayıt sayısı ile gösterilen kayıt sayısı
+    ayrı verilmişse bu iki sayıyı birbirine karıştırma.
+
+25. Listeleme sonucunda kullanıcı tüm kayıtları istemediği sürece
+    kaynakta gösterilen kayıtların dışına çıkma.
+
+26. Listeleme cevabında mümkün olduğunda önce toplam kayıt sayısını,
+    ardından gösterilen kayıtları belirt.
+
+27. Kullanıcı belirli filtrelerle listeleme istediyse
+    yalnızca kaynakta verilen ve bu filtrelere uyan kayıtları kullan.
 
 ÖNEMLİ ÖRNEKLER:
 
@@ -74,6 +95,7 @@ class PromptBuilder:
     ) -> dict[str, Any]:
 
         status = context_result.get("status")
+        is_listing = status == "listing"
 
         llm_allowed = context_result.get(
             "llm_allowed",
@@ -110,12 +132,30 @@ class PromptBuilder:
                 ),
             }
 
+        if is_listing:
+
+            listing_instruction = (
+                "\n\n"
+                "LİSTELEME KURALLARI:\n"
+                "- Önce kaynakta verilen toplam kayıt sayısını belirt.\n"
+                "- Ardından yalnızca kaynakta gösterilen kayıtları listele.\n"
+                "- Gösterilen kayıt sayısı toplam sayıdan azsa bunu açıkça belirt.\n"
+                "- Kaynakta bulunmayan hiçbir OSB'yi ekleme.\n"
+                "- OSB adlarını kaynakta verildiği şekilde kullan.\n"
+                "- Kaynakta olmayan bilgileri tahmin etme.\n"
+            )
+
+        else:
+
+            listing_instruction = ""
+
         user_prompt = (
             "KAYNAK:\n"
             "--------------------\n"
             f"{context}\n"
             "--------------------\n\n"
-            f"SORU:\n{query}\n\n"
+            f"SORU:\n{query}"
+            f"{listing_instruction}\n"
             "YANIT:"
         )
 

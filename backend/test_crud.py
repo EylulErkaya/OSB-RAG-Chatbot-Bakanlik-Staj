@@ -1,5 +1,5 @@
-from app.db.database import SessionLocal
-from app.models import Conversation, Message
+from backend.app.db.database import SessionLocal
+from backend.app.models import Conversation, Message
 
 
 def main():

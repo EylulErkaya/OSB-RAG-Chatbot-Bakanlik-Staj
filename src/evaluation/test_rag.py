@@ -379,10 +379,10 @@ def run_test(
 
 
 # ============================================================
-# AMBIGUOUS SELECTION TEST
+# AMBIGUOUS SELECTION - CHECK (mantık burada, tuple döner)
 # ============================================================
 
-def test_ambiguous_selection() -> tuple[bool, list[str]]:
+def _check_ambiguous_selection() -> tuple[bool, list[str]]:
 
     errors = []
 
@@ -399,154 +399,100 @@ def test_ambiguous_selection() -> tuple[bool, list[str]]:
     retrieval = result["retrieval"]
 
     if retrieval.get("status") != "ambiguous":
-        errors.append(
-            "İlk soru ambiguous dönmedi."
-        )
-
+        errors.append("İlk soru ambiguous dönmedi.")
         return False, errors
 
     if not pipeline.pending_query:
-        errors.append(
-            "pending_query oluşturulmadı."
-        )
+        errors.append("pending_query oluşturulmadı.")
 
     if not pipeline.pending_candidates:
-        errors.append(
-            "pending_candidates oluşturulmadı."
-        )
+        errors.append("pending_candidates oluşturulmadı.")
 
     # --------------------------------------------------------
     # 2. Kullanıcı 1'i seçiyor
     # --------------------------------------------------------
 
     selection_result = pipeline.ask("1")
-
-    selection_retrieval = (
-        selection_result["retrieval"]
-    )
+    selection_retrieval = selection_result["retrieval"]
 
     if selection_retrieval.get("status") != "success":
-        errors.append(
-            "Numaralı seçim sonrası "
-            "retrieval success olmadı."
-        )
+        errors.append("Numaralı seçim sonrası retrieval success olmadı.")
 
-    selected_osb = selection_result.get(
-        "selected_osb"
-    )
+    selected_osb = selection_result.get("selected_osb")
 
     if not selected_osb:
-        errors.append(
-            "selected_osb bulunamadı."
-        )
-
+        errors.append("selected_osb bulunamadı.")
     else:
-
-        if (
-            selection_retrieval.get("osb_id")
-            != selected_osb.get("id")
-        ):
-            errors.append(
-                "Seçilen OSB ID ile retrieval "
-                "OSB ID eşleşmiyor."
-            )
-
-        if (
-            selection_retrieval.get("osb_name")
-            != selected_osb.get("name")
-        ):
-            errors.append(
-                "Seçilen OSB adı ile retrieval "
-                "OSB adı eşleşmiyor."
-            )
+        if selection_retrieval.get("osb_id") != selected_osb.get("id"):
+            errors.append("Seçilen OSB ID ile retrieval OSB ID eşleşmiyor.")
+        if selection_retrieval.get("osb_name") != selected_osb.get("name"):
+            errors.append("Seçilen OSB adı ile retrieval OSB adı eşleşmiyor.")
 
     # --------------------------------------------------------
     # 3. State temizliği
     # --------------------------------------------------------
 
     if pipeline.pending_query is not None:
-        errors.append(
-            "Seçim sonrasında pending_query "
-            "temizlenmedi."
-        )
+        errors.append("Seçim sonrasında pending_query temizlenmedi.")
 
     if pipeline.pending_candidates:
-        errors.append(
-            "Seçim sonrasında pending_candidates "
-            "temizlenmedi."
-        )
+        errors.append("Seçim sonrasında pending_candidates temizlenmedi.")
 
-    return (
-        len(errors) == 0,
-        errors,
-    )
+    return len(errors) == 0, errors
 
 
 # ============================================================
-# INVALID SELECTION TEST
+# PYTEST TEST - gerçek assert burada
 # ============================================================
 
-def test_invalid_selection() -> tuple[bool, list[str]]:
+def test_ambiguous_selection():
+
+    success, errors = _check_ambiguous_selection()
+
+    assert success, "\n".join(errors)
+
+
+# ============================================================
+# INVALID SELECTION - CHECK
+# ============================================================
+
+def _check_invalid_selection() -> tuple[bool, list[str]]:
 
     errors = []
 
     pipeline = RAGPipeline()
 
-    # Önce ambiguous state oluştur
     result = pipeline.ask(
         "Malatya OSB'de kaç fabrika üretim yapıyor?"
     )
 
-    if result["retrieval"].get(
-        "status"
-    ) != "ambiguous":
-
-        errors.append(
-            "Invalid selection testi için "
-            "ambiguous state oluşturulamadı."
-        )
-
+    if result["retrieval"].get("status") != "ambiguous":
+        errors.append("Invalid selection testi için ambiguous state oluşturulamadı.")
         return False, errors
 
-    # Geçersiz seçim
     invalid_result = pipeline.ask("99")
-
     retrieval = invalid_result["retrieval"]
 
-    if retrieval.get(
-        "status"
-    ) != "selection_error":
+    if retrieval.get("status") != "selection_error":
+        errors.append("Geçersiz seçim selection_error döndürmedi.")
 
-        errors.append(
-            "Geçersiz seçim "
-            "selection_error döndürmedi."
-        )
+    if invalid_result["answer"].get("llm_called"):
+        errors.append("Geçersiz seçimde LLM çağrıldı.")
 
-    if invalid_result["answer"].get(
-        "llm_called"
-    ):
-        errors.append(
-            "Geçersiz seçimde LLM çağrıldı."
-        )
-
-    # State korunmalı
     if not pipeline.pending_query:
-        errors.append(
-            "Geçersiz seçimden sonra "
-            "pending_query kayboldu."
-        )
+        errors.append("Geçersiz seçimden sonra pending_query kayboldu.")
 
     if not pipeline.pending_candidates:
-        errors.append(
-            "Geçersiz seçimden sonra "
-            "pending_candidates kayboldu."
-        )
+        errors.append("Geçersiz seçimden sonra pending_candidates kayboldu.")
 
-    return (
-        len(errors) == 0,
-        errors,
-    )
+    return len(errors) == 0, errors
 
+
+def test_invalid_selection():
+
+    success, errors = _check_invalid_selection()
+
+    assert success, "\n".join(errors)
 
 # ============================================================
 # MAIN
@@ -605,7 +551,7 @@ def main():
     print("\n" + "-" * 70)
     print("AMBIGUOUS SELECTION TEST")
 
-    success, errors = test_ambiguous_selection()
+    success, errors = _check_invalid_selection()
 
     if success:
 
@@ -627,7 +573,7 @@ def main():
     print("\n" + "-" * 70)
     print("INVALID SELECTION TEST")
 
-    success, errors = test_invalid_selection()
+    success, errors = _check_invalid_selection()
 
     if success:
 

@@ -30,6 +30,8 @@ import ollama
 from src.retrieval.osb_resolver import (
     resolve_osb,
     compare_candidate_field,
+    list_osbs,
+
 )
 
 from .sector_resolver import (
@@ -182,6 +184,218 @@ def extract_city(query: str, osb_name: str | None = None):
     # "Malatya OSB" gibi isimler için
     return first_part
 
+def extract_listing_filters(query: str):
+    """
+    Listeleme sorgusundan filtreleri çıkarır.
+
+    Desteklenen filtreler:
+
+        city
+        district
+        region
+        osb_type
+        stage
+        investment_program
+        earthquake_region
+        incentive_region
+    """
+
+    if not query:
+        return {
+            "city": None,
+            "district": None,
+            "region": None,
+            "osb_type": None,
+            "stage": None,
+            "investment_program": None,
+            "earthquake_region": None,
+            "incentive_region": None,
+        }
+
+    text = query.strip()
+
+    normalized = text.lower()
+    
+    regions = [
+        "Akdeniz",
+        "Doğu Anadolu",
+        "Güneydoğu Anadolu",
+        "İç Anadolu",
+        "Karadeniz",
+        "Marmara",
+        "Ege",
+    ]
+
+    filters = {
+        "city": None,
+        "district": None,
+        "region": None,
+        "osb_type": None,
+        "stage": None,
+        "investment_program": None,
+        "earthquake_region": None,
+        "incentive_region": None,
+    }
+
+    # ========================================================
+    # ŞEHİR
+    # ========================================================
+
+    city_match = re.search(
+        r"\b([A-ZÇĞİÖŞÜa-zçğıöşü]+)"
+        r"(?:'|’)?"
+        r"(?:daki|deki|taki|teki)\b",
+        text,
+        flags=re.IGNORECASE,
+    )
+
+    if city_match:
+
+        value = city_match.group(1).strip()
+
+        value_lower = value.lower()
+
+        # ----------------------------------------------------
+        # Bölge isimlerinin parçalarını şehir olarak alma
+        # ----------------------------------------------------
+        #
+        # Örnek:
+        #
+        # Doğu Anadolu'daki
+        #             ↑
+        # "Anadolu" şehir değildir.
+        #
+        # İç Anadolu'daki
+        # Güneydoğu Anadolu'daki
+        # Karadeniz'deki
+        # gibi sorgularda da aynı durum oluşabilir.
+        # ----------------------------------------------------
+
+        region_parts = set()
+
+        for region in regions:
+
+            for part in region.lower().split():
+
+                region_parts.add(part)
+
+        if (
+            value_lower != "türkiye"
+            and value_lower not in region_parts
+        ):
+            filters["city"] = value
+
+    # ========================================================
+    # BÖLGE
+    # ========================================================
+
+    for region in regions:
+
+        if region.lower() in normalized:
+
+            filters["region"] = region
+            break
+
+    # ========================================================
+    # OSB TÜRÜ
+    # ========================================================
+
+    osb_types = [
+        "Karma",
+        "İhtisas",
+        "Tarıma Dayalı",
+    ]
+
+    for osb_type in osb_types:
+
+        if osb_type.lower() in normalized:
+
+            filters["osb_type"] = osb_type
+            break
+
+    # ========================================================
+    # İLÇE
+    # ========================================================
+
+    district_match = re.search(
+        r"\b([A-ZÇĞİÖŞÜa-zçğıöşü]+)"
+        r"(?:'|’)?"
+        r"(?:ilçesindeki|ilçesindeki)\b",
+        text,
+        flags=re.IGNORECASE,
+    )
+
+    if district_match:
+
+        filters["district"] = (
+            district_match.group(1).strip()
+        )
+
+    # ========================================================
+    # AŞAMA
+    # ========================================================
+
+    stages = [
+        "faaliyette",
+        "inşaat",
+        "proje",
+        "planlama",
+        "kamulaştırma",
+    ]
+
+    for stage in stages:
+
+        if stage in normalized:
+
+            filters["stage"] = stage
+            break
+
+    # ========================================================
+    # YATIRIM PROGRAMI
+    # ========================================================
+
+    if "yatırım programında" in normalized:
+        filters["investment_program"] = "Evet"
+
+    elif "yatırım programında olmayan" in normalized:
+        filters["investment_program"] = "Hayır"
+
+    elif "yatırım programında değil" in normalized:
+        filters["investment_program"] = "Hayır"
+
+    # ========================================================
+    # DEPREM BÖLGESİ
+    # ========================================================
+
+    if "deprem bölgesinde" in normalized:
+
+        if (
+            "değil" in normalized
+            or "olmayan" in normalized
+        ):
+            filters["earthquake_region"] = "Hayır"
+
+        else:
+            filters["earthquake_region"] = "Evet"
+
+    # ========================================================
+    # TEŞVİK BÖLGESİ
+    # ========================================================
+
+    incentive_match = re.search(
+        r"(\d+)\.?\s*(?:teşvik bölgesi|teşvik bölgesindeki)",
+        normalized,
+        flags=re.IGNORECASE,
+    )
+
+    if incentive_match:
+
+        filters["incentive_region"] = (
+            incentive_match.group(1)
+        )
+
+    return filters
+
 
 # ============================================================
 # QUERY EMBEDDING
@@ -212,6 +426,9 @@ def retrieve(
     top_k: int = CHROMA_TOP_K,
     selected_osb_id: int | None = None,
     selected_osb_name: str | None = None,
+    offset: int = 0,
+    limit: int = 10,
+    listing_filters: dict | None = None,
 ):
     """
     Gerçek retrieval pipeline.
@@ -243,6 +460,63 @@ def retrieve(
     chunk_type = get_chunk_type(
         intent
     )
+    
+    # ========================================================
+    # LISTING
+    # ========================================================
+
+    if intent == "listing":
+
+        listing_filters = listing_filters or extract_listing_filters(
+            query
+        )
+
+        listing_result = list_osbs(
+            city=listing_filters["city"],
+            district=listing_filters["district"],
+            region=listing_filters["region"],
+            osb_type=listing_filters["osb_type"],
+            stage=listing_filters["stage"],
+            investment_program=listing_filters[
+                "investment_program"
+            ],
+            earthquake_region=listing_filters[
+                "earthquake_region"
+            ],
+            incentive_region=listing_filters[
+                "incentive_region"
+            ],
+            limit=limit,
+            offset=offset,
+        )
+
+        return {
+            "status": "listing",
+            "query": query,
+            "intent": intent,
+            "intent_confidence": (
+                intent_result["confidence"]
+            ),
+            "chunk_type": None,
+            "osb_id": None,
+            "osb_name": None,
+            "filters": listing_filters,
+            "total_count": (
+                listing_result["total_count"]
+            ),
+            "limit": (
+                listing_result["limit"]
+            ),
+            "offset": (
+                listing_result["offset"]
+            ),
+            "returned_count": (
+                listing_result["returned_count"]
+            ),
+            "results": (
+                listing_result["results"]
+            ),
+        }
 
     sector_keyword = None
     effective_top_k = top_k
@@ -745,6 +1019,106 @@ def print_results(result):
 
         return
 
+    
+    
+    # --------------------------------------------------------
+    # LISTING
+    # --------------------------------------------------------
+
+    if result.get(
+        "status"
+    ) == "listing":
+
+        total_count = result.get(
+            "total_count",
+            0,
+        )
+
+        limit = result.get(
+            "limit",
+            10,
+        )
+
+        offset = result.get(
+            "offset",
+            0,
+        )
+
+        returned_count = result.get(
+            "returned_count",
+            0,
+        )
+
+        filters = result.get(
+            "filters",
+            {},
+        )
+
+        results = result.get(
+            "results",
+            [],
+        )
+
+        print(
+            f"\nToplam kayıt: {total_count}"
+        )
+
+        print(
+            f"Offset: {offset}"
+        )
+
+        print(
+            f"Limit: {limit}"
+        )
+
+        print(
+            f"Dönen kayıt: {returned_count}"
+        )
+
+        print(
+            "\nFiltreler:"
+        )
+
+        print(
+            f"  Şehir: "
+            f"{filters.get('city')}"
+        )
+
+        print(
+            f"  İlçe: "
+            f"{filters.get('district')}"
+        )
+
+        print(
+            f"  Bölge: "
+            f"{filters.get('region')}"
+        )
+
+        print(
+            f"  OSB Türü: "
+            f"{filters.get('osb_type')}"
+        )
+
+        print(
+            "\nListe:"
+        )
+
+        for index, item in enumerate(
+            results,
+            start=offset + 1,
+        ):
+
+            print(
+                f"{index} | "
+                f"{item.get('id')} | "
+                f"{item.get('name')} | "
+                f"{item.get('city')} | "
+                f"{item.get('district')} | "
+                f"{item.get('region')} | "
+                f"{item.get('type')}"
+            )
+
+        return
 
     # --------------------------------------------------------
     # RESULTS
@@ -918,6 +1292,10 @@ TEST_QUERIES = [
     # ========================================================
 
     "Olmayanşehir OSB'de kaç boş parsel var?",
+    
+    "Malatya'daki OSB'leri listele",
+    "Doğu Anadolu'daki OSB'leri listele",
+    "Malatya'daki Karma OSB'leri listele",
 ]
 
 # ============================================================

@@ -1,6 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
+from backend.app.core.json_utils import sanitize_for_json
 from backend.app.db.database import get_db
 from backend.app.models import Conversation, Message
 from backend.app.schemas.chat import ChatRequest, ChatResponse
@@ -11,9 +12,6 @@ router = APIRouter(
     prefix="/chat",
     tags=["Chat"],
 )
-
-
-rag_service = RAGService()
 
 
 @router.post(
@@ -47,10 +45,110 @@ def chat(
     db.commit()
     db.refresh(user_message)
 
+    # Her istek için ayrı bir pipeline kullanılır. Bekleyen seçim durumu
+    # Conversation üzerinde tutulduğundan, global bir pipeline farklı
+    # kullanıcıların durumlarını birbirine karıştırabilir.
+    rag_service = RAGService()
+
+    if conversation.pending_query and conversation.pending_candidates:
+        rag_service.restore_pending_state(
+            conversation.pending_query,
+            conversation.pending_candidates,
+        )
+        
+    if conversation.pending_listing:
+        rag_service.restore_pending_listing(
+            conversation.pending_listing
+        )
+
     # RAG
     result = rag_service.ask(
         request.message
     )
+    
+    # ==========================================
+    # RAG CONVERSATION STATE
+    # ==========================================
+
+    retrieval = result.get(
+        "retrieval",
+        {}
+    )
+
+    retrieval_status = retrieval.get(
+        "status"
+    )
+
+    # ------------------------------------------
+    # AMBIGUOUS STATE
+    # ------------------------------------------
+
+    if retrieval_status == "ambiguous":
+
+        conversation.pending_query = (
+            request.message
+        )
+
+        conversation.pending_candidates = (
+            sanitize_for_json(
+                retrieval.get(
+                    "candidates",
+                    []
+                )
+            )
+        )
+
+        conversation.pending_listing = None
+
+    # ------------------------------------------
+    # LISTING STATE
+    # ------------------------------------------
+
+    elif retrieval_status == "listing":
+
+        conversation.pending_listing = sanitize_for_json(
+            {
+                "query": retrieval.get(
+                    "query",
+                    request.message,
+                ),
+                "filters": retrieval.get(
+                    "filters",
+                    {}
+                ),
+                "offset": retrieval.get(
+                    "offset",
+                    0
+                ),
+                "limit": retrieval.get(
+                    "limit",
+                    10
+                ),
+                "total_count": retrieval.get(
+                    "total_count",
+                    0
+                ),
+            }
+        )
+
+        conversation.pending_query = None
+        conversation.pending_candidates = None
+
+    # Geçersiz seçimde mevcut adayları koru; kullanıcı yeniden seçim
+    # yapabilmelidir.
+    elif retrieval_status == "selection_error":
+
+        pass
+
+    # ------------------------------------------
+    # NORMAL SUCCESS / OTHER
+    # ------------------------------------------
+
+    else:
+
+        conversation.pending_query = None
+        conversation.pending_candidates = None
+        conversation.pending_listing = None
 
     answer_data = result.get("answer", {})
 
