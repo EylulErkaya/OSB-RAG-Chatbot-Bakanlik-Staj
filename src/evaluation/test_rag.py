@@ -102,6 +102,14 @@ TEST_CASES = [
         "expected_answer_contains": ["15"],
     },
 
+    {
+        "query": "Malatya-Güney OSB'de kaç parsel vardır?",
+        "expected_status": "success",
+        "expected_intent": "parcel",
+        "expected_osb_id": 305,
+        "expected_answer_contains": ["50", "31"],
+    },
+
     # ========================================================
     # EK İSTİHDAM TESTLERİ
     # ========================================================

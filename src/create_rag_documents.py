@@ -160,11 +160,11 @@ for _, osb in osb_df.iterrows():
             "Parsel Sayısı (İmar)"
         ),
         (
-            "Bölge parsel sayısı",
+            "Parsel sayısı (Bölge)",
             "Parsel Sayısı  (Bölge)"
         ),
         (
-            "Toplam parsel sayısı",
+            "Toplam parsel sayısı (Bölge ve Öngörü)",
             "Toplam Parsel Sayısı (Bölge ve Öngörü)"
         ),
         (

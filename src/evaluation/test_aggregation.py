@@ -96,6 +96,10 @@ def test_metric_mapping_uses_verified_column_names():
     assert resolve_metric("toplam istihdam") == "Toplam İstihdam"
     assert resolve_metric("üretimde kaç fabrika") == "Üretimdeki Toplam Fabrika Sayısı"
     assert resolve_metric("boş parsel") == "Boş Parsel Sayısı"
+    assert resolve_metric("toplam parsel sayısı") == "Toplam Parsel Sayısı (Bölge ve Öngörü)"
+    assert resolve_metric("imar parsel sayısı") == "Parsel Sayısı (İmar)"
+    assert resolve_metric("bölge parsel sayısı") == "Parsel Sayısı  (Bölge)"
+    assert resolve_metric("öngörü parsel") == "Öngörü Parsel"
 
 
 def test_existing_single_osb_query_not_broken():

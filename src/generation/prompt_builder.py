@@ -57,6 +57,8 @@ KESİN KURALLAR:
 27. Kullanıcı belirli filtrelerle listeleme istediyse
     yalnızca kaynakta verilen ve bu filtrelere uyan kayıtları kullan.
 
+28. Kullanıcı sorusunda "toplam" kelimesini açıkça kullanmadıysa (örneğin "kaç parsel vardır" veya "parsel sayısı kaçtır" denildiğinde), cevabına "toplam" kelimesini veya "toplam parsel sayısı (Bölge ve Öngörü)" alanını ekleme. Kullanıcı alt metrik belirtmediyse (imar veya bölge gibi), cevabında hem İmar parsel sayısını hem de Bölge parsel sayısını ayrı iki kalem olarak belirt.
+
 ÖNEMLİ ÖRNEKLER:
 
 Kaynak:
@@ -97,6 +99,7 @@ class PromptBuilder:
         status = context_result.get("status")
         is_listing = status == "listing"
         is_aggregation = status == "aggregation"
+        is_ranking = status == "ranking"
 
         llm_allowed = context_result.get(
             "llm_allowed",
@@ -158,6 +161,56 @@ class PromptBuilder:
             "kayıtlar üzerinden hesaplandığını belirt.\n"
         ) if is_aggregation else ""
 
+        ranking_instruction = (
+            "\n\nRANKING KURALLARI:\n"
+            "- KAYNAK içindeki `Hazır Sıralama Sonucu` ve kazanan OSB bilgilerini aynen kullan.\n"
+            "- Yeni hesaplama veya sıralama yapma, sayıyı değiştirme veya tahmin etme.\n"
+            "- Kazanan OSB adını ve ilgili metrik değerini doğrudan yanıt olarak belirt.\n"
+        ) if is_ranking else ""
+
+        normalized_query = query.lower()
+        is_parcel_query = "parsel" in normalized_query and not (is_aggregation or is_ranking)
+
+        if is_parcel_query:
+            has_toplam = "toplam" in normalized_query
+            has_imar = "imar" in normalized_query
+            has_bolge = "bölge" in normalized_query or "bolge" in normalized_query
+            has_ongoru = "öngörü" in normalized_query or "ongoru" in normalized_query
+            has_bos = "boş" in normalized_query or "bos" in normalized_query
+            has_tahsis = "tahsis" in normalized_query
+
+            if not (has_toplam or has_imar or has_bolge or has_ongoru or has_bos or has_tahsis):
+                parcel_instruction = (
+                    "\n\nPARSEL SORGUSU ÖZEL KURALI:\n"
+                    "- Kullanıcı genel bir parsel sayısı sormuştur (toplam, imar, bölge veya öngörü belirtmemiştir).\n"
+                    "- KESİNLİKLE 'toplam parsel sayısı (Bölge ve Öngörü)' alanını veya 'toplam' kelimesini KULLANMA.\n"
+                    "- Cevapta hem İmar parsel sayısını hem de Bölge parsel sayısını açıkça iki ayrı kalemde belirt:\n"
+                    "  - İmar parsel sayısı: [değer]\n"
+                    "  - Bölge parsel sayısı: [değer]\n"
+                )
+            elif has_toplam:
+                parcel_instruction = (
+                    "\n\nPARSEL SORGUSU ÖZEL KURALI:\n"
+                    "- Kullanıcı özellikle 'toplam' parsel sayısını sormuştur.\n"
+                    "- Yanıtta kaynakta verilen 'Toplam parsel sayısı (Bölge ve Öngörü)' değerini kullan.\n"
+                )
+            elif has_imar:
+                parcel_instruction = (
+                    "\n\nPARSEL SORGUSU ÖZEL KURALI:\n"
+                    "- Kullanıcı özellikle 'imar parsel sayısı' sormuştur.\n"
+                    "- Yanıtta kaynakta verilen 'İmar parsel sayısı' değerini kullan.\n"
+                )
+            elif has_bolge:
+                parcel_instruction = (
+                    "\n\nPARSEL SORGUSU ÖZEL KURALI:\n"
+                    "- Kullanıcı özellikle 'bölge parsel sayısı' sormuştur.\n"
+                    "- Yanıtta kaynakta verilen 'Bölge parsel sayısı' değerini kullan.\n"
+                )
+            else:
+                parcel_instruction = ""
+        else:
+            parcel_instruction = ""
+
         user_prompt = (
             "KAYNAK:\n"
             "--------------------\n"
@@ -166,6 +219,8 @@ class PromptBuilder:
             f"SORU:\n{query}"
             f"{listing_instruction}\n"
             f"{aggregation_instruction}\n"
+            f"{ranking_instruction}\n"
+            f"{parcel_instruction}\n"
             "YANIT:"
         )
 

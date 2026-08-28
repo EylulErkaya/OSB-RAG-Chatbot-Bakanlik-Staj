@@ -52,6 +52,8 @@ from src.retrieval.reranker import Reranker
 from src.analytics.osb_aggregation import (
     aggregate_osbs,
     resolve_metric,
+    rank_osbs,
+    resolve_ranking_spec,
 )
 
 
@@ -488,6 +490,46 @@ def retrieve(
             "osb_name": None,
             "filters": aggregation_filters,
             "aggregation": aggregation_result,
+            "results": [],
+        }
+
+    # ========================================================
+    # STRUCTURED RANKING
+    # ========================================================
+    if intent == "ranking":
+
+        ranking_filters = extract_listing_filters(query)
+        ranking_spec = resolve_ranking_spec(query)
+
+        if not ranking_spec:
+            return {
+                "status": "not_found",
+                "query": query,
+                "intent": intent,
+                "intent_confidence": intent_result["confidence"],
+                "chunk_type": None,
+                "osb_id": None,
+                "osb_name": None,
+                "results": [],
+            }
+
+        metric, operation = ranking_spec
+        ranking_result = rank_osbs(
+            **ranking_filters,
+            metric=metric,
+            operation=operation,
+        )
+
+        return {
+            "status": "ranking",
+            "query": query,
+            "intent": intent,
+            "intent_confidence": intent_result["confidence"],
+            "chunk_type": None,
+            "osb_id": None,
+            "osb_name": None,
+            "filters": ranking_filters,
+            "ranking": ranking_result,
             "results": [],
         }
 

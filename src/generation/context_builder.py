@@ -80,6 +80,16 @@ class ContextBuilder:
             )
 
         # ====================================================
+        # STRUCTURED RANKING
+        # ====================================================
+
+        if status == "ranking":
+
+            return self._build_ranking_context(
+                retrieval_result
+            )
+
+        # ====================================================
         # BEKLENMEYEN DURUM
         # ====================================================
 
@@ -341,9 +351,16 @@ class ContextBuilder:
         index: int,
     ) -> str:
 
+        doc = document
+        doc = doc.replace("Bölge parsel sayısı:", "Parsel sayısı (Bölge):")
+        doc = doc.replace("Bölge parsel sayısı :", "Parsel sayısı (Bölge) :")
+        if "Bölge ve Öngörü" not in doc:
+            doc = doc.replace("Toplam parsel sayısı:", "Toplam parsel sayısı (Bölge ve Öngörü):")
+            doc = doc.replace("Toplam parsel sayısı :", "Toplam parsel sayısı (Bölge ve Öngörü) :")
+
         return (
             f"[Kaynak {index}]\n"
-            f"{document}"
+            f"{doc}"
         )
 
     # ========================================================
@@ -703,6 +720,76 @@ class ContextBuilder:
         return {
             "status": "aggregation",
             "context": "\n".join(context_lines),
+            "llm_allowed": True,
+            "message": None,
+        }
+
+    # ========================================================
+    # RANKING CONTEXT
+    # ========================================================
+
+    def _build_ranking_context(
+        self,
+        retrieval_result: dict[str, Any],
+    ) -> dict[str, Any]:
+
+        ranking_data = retrieval_result.get("ranking", {})
+
+        if ranking_data.get("status") != "success":
+
+            return {
+                "status": "not_found",
+                "context": "",
+                "llm_allowed": False,
+                "message": (
+                    "Belirtilen sıralama kriteri için "
+                    "veri kaynağında uygun kayıt bulunamadı."
+                ),
+            }
+
+        winners = ranking_data.get("winners", [])
+
+        if not winners:
+
+            return {
+                "status": "not_found",
+                "context": "",
+                "llm_allowed": False,
+                "message": (
+                    "Belirtilen sıralama kriteri için "
+                    "veri kaynağında uygun kayıt bulunamadı."
+                ),
+            }
+
+        metric = ranking_data.get("metric", "")
+        operation = ranking_data.get("operation", "MAX")
+        formatted_val = ranking_data.get("formatted_target_value", "")
+        filters = ranking_data.get("filters", {})
+        city = filters.get("city")
+
+        op_desc = "en fazla/en yüksek" if operation == "MAX" else "en eski/en düşük"
+
+        lines = [
+            "Hazır Sıralama Sonucu:",
+        ]
+
+        if city:
+            lines.append(f"Kapsam (İl): {city}")
+
+        lines.append(f"Kriter: {metric} ({op_desc})")
+        lines.append(f"Hesaplanan Değer: {formatted_val}")
+        lines.append("Kazanan OSB(ler):")
+
+        for winner in winners:
+            lines.append(
+                f"- {winner['osb_name']} (İl: {winner['city']}, İlçe: {winner['district']}): {winner['formatted_value']}"
+            )
+
+        context = "\n".join(lines)
+
+        return {
+            "status": "ranking",
+            "context": context,
             "llm_allowed": True,
             "message": None,
         }

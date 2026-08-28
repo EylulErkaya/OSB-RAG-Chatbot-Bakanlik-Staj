@@ -7,6 +7,8 @@ import re
 
 INTENT_RULES = {
 
+    "ranking": [],
+
     "aggregation": [
         "toplam",
         "toplamda",
@@ -144,6 +146,29 @@ def is_aggregation_query(query: str) -> bool:
     return has_aggregation_word and has_multi_osb_scope
 
 
+def is_ranking_query(query: str) -> bool:
+    """Identify ranking / comparison questions over structured fields."""
+
+    normalized = normalize_text(query)
+
+    if is_single_osb_query(normalized):
+        return False
+
+    if "en büyük" in normalized or "en buyuk" in normalized:
+        return False
+
+    ranking_phrases = [
+        "en fazla",
+        "en çok",
+        "en cok",
+        "en yüksek",
+        "en yuksek",
+        "en eski",
+    ]
+
+    return any(phrase in normalized for phrase in ranking_phrases)
+
+
 # ============================================================
 # INTENT CLASSIFIER
 # ============================================================
@@ -169,11 +194,14 @@ def detect_intent(query: str):
             "scores": scores,
         }
 
-    # ============================================================
-    # ÜRETİM / İNŞAAT / PROJE BAĞLAMINDA PARSEL
-    # ============================================================
-    # "üretimde kaç parsel", "inşaattaki parsel",
-    # "projede bulunan parsel" gibi sorular aslında
+    if is_ranking_query(query):
+        scores["ranking"] = 1
+        return {
+            "intent": "ranking",
+            "confidence": 1.0,
+            "scores": scores,
+        }
+
     # employment chunk'ındaki bilgiyi hedefler.
 
     production_context_keywords = [
