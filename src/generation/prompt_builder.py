@@ -96,6 +96,7 @@ class PromptBuilder:
 
         status = context_result.get("status")
         is_listing = status == "listing"
+        is_aggregation = status == "aggregation"
 
         llm_allowed = context_result.get(
             "llm_allowed",
@@ -149,6 +150,14 @@ class PromptBuilder:
 
             listing_instruction = ""
 
+        aggregation_instruction = (
+            "\n\nAGGREGATION KURALLARI:\n"
+            "- KAYNAK içindeki `Hazır sonuç` değerini aynen kullan.\n"
+            "- Yeni hesaplama yapma, sayıyı değiştirme veya tahmin etme.\n"
+            "- Eksik veri sayısı sıfırdan büyükse, sonucun yalnızca geçerli "
+            "kayıtlar üzerinden hesaplandığını belirt.\n"
+        ) if is_aggregation else ""
+
         user_prompt = (
             "KAYNAK:\n"
             "--------------------\n"
@@ -156,6 +165,7 @@ class PromptBuilder:
             "--------------------\n\n"
             f"SORU:\n{query}"
             f"{listing_instruction}\n"
+            f"{aggregation_instruction}\n"
             "YANIT:"
         )
 

@@ -146,6 +146,9 @@ def resolve_osb(
             "city": str(row["İl Adı"]),
             "district": str(row["İlçe"]),
             "region": str(row["Bölge"]),
+            "osb_type": str(row["OSB Türü"]),
+            "sicil_no": str(row["Sicil No"]),
+            "kurulus_yili": str(row["OSB Kuruluş Yılı"]),
             "data": row.to_dict(),
         })
 
@@ -210,6 +213,94 @@ def compare_candidate_field(
         "status": "different",
         "values": values
     }
+
+
+def filter_osbs(
+    city: str | None = None,
+    district: str | None = None,
+    region: str | None = None,
+    osb_type: str | None = None,
+    stage: str | None = None,
+    investment_program: str | None = None,
+    earthquake_region: str | None = None,
+    incentive_region: str | None = None,
+):
+    """Return OSB rows matching the filters used by ``list_osbs``.
+
+    This keeps structured queries and the existing listing path on the same
+    filter semantics without changing listing's pagination or response shape.
+    """
+
+    filtered = osb_df.copy()
+
+    if city:
+        value = normalize_text(city)
+        filtered = filtered[
+            filtered["İl Adı"].astype(str).str.strip().str.lower() == value
+        ]
+
+    if district:
+        value = normalize_text(district)
+        filtered = filtered[
+            filtered["İlçe"].astype(str).str.strip().str.lower() == value
+        ]
+
+    if region:
+        value = normalize_text(region)
+        filtered = filtered[
+            filtered["Bölge"].astype(str).str.strip().str.lower() == value
+        ]
+
+    if osb_type:
+        value = normalize_text(osb_type)
+        filtered = filtered[
+            filtered["OSB Türü"].astype(str).str.strip().str.lower() == value
+        ]
+
+    if stage:
+        value = normalize_text(stage)
+        filtered = filtered[
+            filtered["Aşama"].astype(str).str.strip().str.lower().str.contains(
+                value,
+                na=False,
+            )
+        ]
+
+    if investment_program:
+        filtered = filtered[
+            filtered["Yatırım Programı"].apply(_normalize_investment)
+            == investment_program
+        ]
+
+    if earthquake_region:
+        filtered = filtered[
+            filtered["DEPREM\nBÖLGESİ"].apply(_normalize_earthquake)
+            == earthquake_region
+        ]
+
+    if incentive_region:
+        value = normalize_text(incentive_region)
+        filtered = filtered[
+            filtered["Teşvik Bölgelerine Göre İller"]
+            .astype(str)
+            .str.strip()
+            .str.lower()
+            .str.contains(value, na=False)
+        ]
+
+    return filtered
+
+
+def _normalize_investment(value):
+    if pd.isna(value):
+        return "Hayır"
+    return "Evet" if str(value).strip() == "+" else "Hayır"
+
+
+def _normalize_earthquake(value):
+    if pd.isna(value):
+        return "Hayır"
+    return "Evet" if str(value).strip() == "+" else "Hayır"
     
     
 def list_osbs(
@@ -241,165 +332,16 @@ def list_osbs(
     Ayrıca pagination destekler.
     """
 
-    filtered = osb_df.copy()
-
-    # ========================================================
-    # ŞEHİR
-    # ========================================================
-
-    if city:
-
-        value = normalize_text(city)
-
-        filtered = filtered[
-            filtered["İl Adı"]
-            .astype(str)
-            .str.strip()
-            .str.lower()
-            == value
-        ]
-
-    # ========================================================
-    # İLÇE
-    # ========================================================
-
-    if district:
-
-        value = normalize_text(district)
-
-        filtered = filtered[
-            filtered["İlçe"]
-            .astype(str)
-            .str.strip()
-            .str.lower()
-            == value
-        ]
-
-    # ========================================================
-    # BÖLGE
-    # ========================================================
-
-    if region:
-
-        value = normalize_text(region)
-
-        filtered = filtered[
-            filtered["Bölge"]
-            .astype(str)
-            .str.strip()
-            .str.lower()
-            == value
-        ]
-
-    # ========================================================
-    # OSB TÜRÜ
-    # ========================================================
-
-    if osb_type:
-
-        value = normalize_text(osb_type)
-
-        filtered = filtered[
-            filtered["OSB Türü"]
-            .astype(str)
-            .str.strip()
-            .str.lower()
-            == value
-        ]
-
-    # ========================================================
-    # AŞAMA
-    # ========================================================
-
-    if stage:
-
-        value = normalize_text(stage)
-
-        filtered = filtered[
-            filtered["Aşama"]
-            .astype(str)
-            .str.strip()
-            .str.lower()
-            .str.contains(
-                value,
-                na=False
-            )
-        ]
-
-    # ========================================================
-    # YATIRIM PROGRAMI
-    # ========================================================
-
-    if investment_program:
-
-        column = "Yatırım Programı"
-
-        def normalize_investment(value):
-
-            if pd.isna(value):
-                return "Hayır"
-
-            value = str(value).strip()
-
-            if value == "+":
-                return "Evet"
-
-            return "Hayır"
-
-        filtered = filtered[
-            filtered[column]
-            .apply(normalize_investment)
-            == investment_program
-        ]
-
-    # ========================================================
-    # DEPREM BÖLGESİ
-    # ========================================================
-
-    if earthquake_region:
-
-        column = "DEPREM\nBÖLGESİ"
-
-        def normalize_earthquake(value):
-
-            if pd.isna(value):
-                return "Hayır"
-
-            value = str(value).strip()
-
-            if value == "+":
-                return "Evet"
-
-            return "Hayır"
-
-        filtered = filtered[
-            filtered[column]
-            .apply(normalize_earthquake)
-            == earthquake_region
-        ]
-
-    # ========================================================
-    # TEŞVİK BÖLGESİ
-    # ========================================================
-
-    if incentive_region:
-
-        value = normalize_text(
-            incentive_region
-        )
-
-        filtered = filtered[
-            filtered[
-                "Teşvik Bölgelerine Göre İller"
-            ]
-            .astype(str)
-            .str.strip()
-            .str.lower()
-            .str.contains(
-                value,
-                na=False
-            )
-        ]
+    filtered = filter_osbs(
+        city=city,
+        district=district,
+        region=region,
+        osb_type=osb_type,
+        stage=stage,
+        investment_program=investment_program,
+        earthquake_region=earthquake_region,
+        incentive_region=incentive_region,
+    )
 
     # ========================================================
     # TÜM SONUÇLAR

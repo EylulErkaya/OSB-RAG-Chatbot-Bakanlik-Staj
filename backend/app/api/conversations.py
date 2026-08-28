@@ -6,6 +6,7 @@ from backend.app.db.database import get_db
 from backend.app.models import Conversation, Message
 from backend.app.schemas import (
     ConversationCreate,
+    ConversationUpdate,
     ConversationResponse,
     ConversationSelection,
     MessageResponse,
@@ -76,6 +77,25 @@ def get_conversation(
             detail="Conversation not found",
         )
 
+    return conversation
+
+
+@router.patch(
+    "/{conversation_id}",
+    response_model=ConversationResponse,
+)
+def update_conversation(
+    conversation_id: int,
+    data: ConversationUpdate,
+    db: Session = Depends(get_db),
+):
+    conversation = db.get(Conversation, conversation_id)
+    if conversation is None:
+        raise HTTPException(status_code=404, detail="Conversation not found")
+
+    conversation.title = data.title.strip()
+    db.commit()
+    db.refresh(conversation)
     return conversation
 
 
@@ -199,6 +219,12 @@ def select_conversation_candidate(
         result = rag_service.select(
             str(data.selection)
         )
+
+        last_osb_state = rag_service.last_osb_state()
+        conversation.last_osb_id = last_osb_state["last_osb_id"]
+        conversation.last_osb_name = last_osb_state["last_osb_name"]
+        conversation.last_intent = last_osb_state["last_intent"]
+        conversation.last_requested_field = last_osb_state["last_requested_field"]
 
         print("RAG RESULT:")
         print(result)

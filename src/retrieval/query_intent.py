@@ -7,6 +7,15 @@ import re
 
 INTENT_RULES = {
 
+    "aggregation": [
+        "toplam",
+        "toplamda",
+        "hepsi",
+        "kaç osb var",
+        "osb'lerin toplam",
+        "osblerin toplam",
+    ],
+
     "parcel": [
         "parsel",
         "boş parsel",
@@ -79,6 +88,62 @@ def normalize_text(text: str) -> str:
     )
 
 
+def is_single_osb_query(query: str) -> bool:
+    """Return True when an explicitly named, singular OSB is in scope."""
+
+    normalized = normalize_text(query)
+    return bool(re.search(
+        r"\b[\wçğıöşü-]+\s+osb['’](?:deki|daki|teki|taki|de|da|nin|nın|nun|nün)\b",
+        normalized,
+    ))
+
+
+def detect_scope(query: str) -> str:
+    """Classify the query scope without changing its intent scores."""
+
+    normalized = normalize_text(query)
+
+    if is_single_osb_query(normalized):
+        return "single_osb"
+
+    has_plural_osb_scope = bool(re.search(
+        r"\bosb(?:'|’)?ler(?:in|i|de|da|den|dan)?\b",
+        normalized,
+    ))
+    has_osb_count_scope = bool(re.search(
+        r"kaç\s+(?:tane\s+)?osb(?:'|’)?(?:ler)?\s+(?:var|bulunuyor|bulunmakta)",
+        normalized,
+    ))
+
+    return "group" if has_plural_osb_scope or has_osb_count_scope else "other"
+
+
+def is_aggregation_query(query: str) -> bool:
+    """Identify multi-OSB calculations without capturing single-OSB questions."""
+
+    normalized = normalize_text(query)
+
+    if is_single_osb_query(normalized):
+        return False
+
+    count_patterns = [
+        r"kaç\s+(?:tane\s+)?osb(?:'|’)?(?:ler)?\s+(?:var|bulunuyor|bulunmakta)",
+        r"osb\s+sayısı",
+    ]
+    if any(re.search(pattern, normalized) for pattern in count_patterns):
+        return True
+
+    has_aggregation_word = any(
+        word in normalized
+        for word in ("toplam", "toplamda", "hepsi")
+    )
+    has_multi_osb_scope = bool(
+        re.search(r"\bosb(?:'|’)?ler(?:in|i|de|da|den|dan)?\b", normalized)
+    )
+
+    return has_aggregation_word and has_multi_osb_scope
+
+
 # ============================================================
 # INTENT CLASSIFIER
 # ============================================================
@@ -86,12 +151,24 @@ def normalize_text(text: str) -> str:
 def detect_intent(query: str):
 
     query = normalize_text(query)
+    scope = detect_scope(query)
 
     scores = {
         intent: 0
         for intent in INTENT_RULES
     }
-    
+
+    # Aggregation scope takes precedence over field keywords such as
+    # "fabrika" and "istihdam".  Single named OSBs are excluded by
+    # is_aggregation_query and continue through the normal scorer.
+    if is_aggregation_query(query):
+        scores["aggregation"] = 1
+        return {
+            "intent": "aggregation",
+            "confidence": 1.0,
+            "scores": scores,
+        }
+
     # ============================================================
     # ÜRETİM / İNŞAAT / PROJE BAĞLAMINDA PARSEL
     # ============================================================
@@ -155,9 +232,16 @@ def detect_intent(query: str):
     # EN YÜKSEK SKOR
     # --------------------------------------------------------
 
+    final_scores = scores.copy()
+
+    # Preserve the raw aggregation score for observability, but never let a
+    # single named OSB be classified as an aggregation on a score tie.
+    if scope == "single_osb":
+        final_scores["aggregation"] = -1
+
     best_intent = max(
-        scores,
-        key=scores.get
+        final_scores,
+        key=final_scores.get
     )
 
     best_score = scores[best_intent]

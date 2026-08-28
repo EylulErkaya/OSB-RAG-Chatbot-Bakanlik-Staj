@@ -1,3 +1,5 @@
+from typing import Any
+
 from pydantic import BaseModel, Field
 
 
@@ -11,3 +13,5 @@ class ChatResponse(BaseModel):
     user_message: str
     answer: str
     status: str
+    candidates: list[dict[str, Any]] | None = None
+    listing: dict[str, Any] | None = None

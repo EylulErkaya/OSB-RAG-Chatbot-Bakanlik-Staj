@@ -70,6 +70,16 @@ class ContextBuilder:
             )
 
         # ====================================================
+        # STRUCTURED AGGREGATION
+        # ====================================================
+
+        if status == "aggregation":
+
+            return self._build_aggregation_context(
+                retrieval_result
+            )
+
+        # ====================================================
         # BEKLENMEYEN DURUM
         # ====================================================
 
@@ -154,6 +164,7 @@ class ContextBuilder:
             "context": context,
             "llm_allowed": True,
             "message": None,
+            "context_osb_source": retrieval_result.get("context_osb_source"),
         }
 
     # ========================================================
@@ -446,6 +457,7 @@ class ContextBuilder:
                 "name",
                 "Bilinmeyen OSB"
             )
+            
 
             city = candidate.get(
                 "city"
@@ -454,12 +466,30 @@ class ContextBuilder:
             district = candidate.get(
                 "district"
             )
+            
+            osb_type = candidate.get("osb_type")
+            sicil_no = candidate.get("sicil_no")
+            kurulus_yili = candidate.get("kurulus_yili")
 
             if city and district:
-
                 lines.append(
                     f"{index}. {name} "
                     f"— {city} / {district}"
+                )
+
+            if osb_type:
+                lines.append(
+                    f"   Tür: {osb_type}"
+                )
+
+            if sicil_no:
+                lines.append(
+                    f"   Sicil No: {sicil_no}"
+                )
+
+            if kurulus_yili:
+                lines.append(
+                    f"   Kuruluş Yılı: {kurulus_yili}"
                 )
 
             elif city:
@@ -621,4 +651,58 @@ class ContextBuilder:
             "limit": limit,
             "offset": offset,
             "returned_count": returned_count,
+        }
+
+    def _build_aggregation_context(
+        self,
+        retrieval_result: dict[str, Any],
+    ) -> dict[str, Any]:
+        aggregation = retrieval_result.get("aggregation", {})
+
+        if aggregation.get("status") != "success":
+            filters = aggregation.get("filters", {})
+            location = filters.get("city") or filters.get("region") or "belirtilen filtreler"
+            return {
+                "status": "not_found",
+                "context": "",
+                "llm_allowed": False,
+                "message": f"{location} için eşleşen OSB kaydı bulunamadı.",
+            }
+
+        filters = aggregation.get("filters", {})
+        location_lines = []
+        labels = {
+            "city": "Şehir",
+            "district": "İlçe",
+            "region": "Bölge",
+            "osb_type": "OSB Türü",
+            "stage": "Aşama",
+            "investment_program": "Yatırım Programı",
+            "earthquake_region": "Deprem Bölgesi",
+            "incentive_region": "Teşvik Bölgesi",
+        }
+        for key, label in labels.items():
+            if filters.get(key):
+                location_lines.append(f"{label}: {filters[key]}")
+
+        operation = "Toplam" if aggregation.get("operation") == "sum" else "Sayı"
+        metric = aggregation.get("metric") or "OSB Sayısı"
+        total = aggregation.get("formatted_total")
+        context_lines = [
+            "AGGREGATION RESULT",
+            *location_lines,
+            f"İşlem: {operation}",
+            f"Metrik: {metric}",
+            f"Eşleşen OSB sayısı: {aggregation.get('matched_count', 0)}",
+            f"Geçerli veri sayısı: {aggregation.get('valid_count', 0)}",
+            f"Eksik veri sayısı: {aggregation.get('missing_count', 0)}",
+            f"Hazır sonuç: {total}",
+            "Bu sayıyı kendin hesaplama; hazır sonucu değiştirmeden kullan.",
+        ]
+
+        return {
+            "status": "aggregation",
+            "context": "\n".join(context_lines),
+            "llm_allowed": True,
+            "message": None,
         }

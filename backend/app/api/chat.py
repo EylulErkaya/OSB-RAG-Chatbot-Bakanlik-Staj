@@ -61,6 +61,13 @@ def chat(
             conversation.pending_listing
         )
 
+    rag_service.restore_last_osb_state(
+        osb_id=conversation.last_osb_id,
+        osb_name=conversation.last_osb_name,
+        intent=conversation.last_intent,
+        requested_field=conversation.last_requested_field,
+    )
+
     # RAG
     result = rag_service.ask(
         request.message
@@ -150,6 +157,12 @@ def chat(
         conversation.pending_candidates = None
         conversation.pending_listing = None
 
+    last_osb_state = rag_service.last_osb_state()
+    conversation.last_osb_id = last_osb_state["last_osb_id"]
+    conversation.last_osb_name = last_osb_state["last_osb_name"]
+    conversation.last_intent = last_osb_state["last_intent"]
+    conversation.last_requested_field = last_osb_state["last_requested_field"]
+
     answer_data = result.get("answer", {})
 
     answer = answer_data.get(
@@ -181,4 +194,10 @@ def chat(
         user_message=request.message,
         answer=answer,
         status=status,
+        candidates=sanitize_for_json(retrieval.get("candidates", [])) or None,
+        listing=sanitize_for_json({
+            key: retrieval[key]
+            for key in ("results", "offset", "limit", "total_count", "returned_count")
+            if key in retrieval
+        }) or None,
     )

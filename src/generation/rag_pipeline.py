@@ -1,6 +1,7 @@
 from typing import Any
 
-from src.retrieval.retrieval_pipeline import retrieve
+from src.retrieval.retrieval_pipeline import extract_osb_name, retrieve
+from src.retrieval.query_intent import detect_intent, detect_requested_field
 
 from .context_builder import ContextBuilder
 from .prompt_builder import PromptBuilder
@@ -26,6 +27,10 @@ class RAGPipeline:
         self.pending_query: str | None = None
         self.pending_candidates: list[dict[str, Any]] = []
         self.pending_listing: dict[str, Any] | None = None
+        self.last_osb_id: int | None = None
+        self.last_osb_name: str | None = None
+        self.last_intent: str | None = None
+        self.last_requested_field: str | None = None
 
     # ========================================================
     # ASK
@@ -135,6 +140,7 @@ class RAGPipeline:
 
             # Retrieval ve cevap başarıyla oluşturulduktan sonra state temizle
             self._clear_pending_state()
+            self._remember_resolved_osb(retrieval_result)
 
             return result
 
@@ -163,9 +169,15 @@ class RAGPipeline:
         # 2. NORMAL RETRIEVAL
         # ====================================================
 
-        retrieval_result = retrieve(
-            query=query
-        )
+        if self._should_use_last_osb(query):
+            retrieval_result = retrieve(
+                query=query,
+                selected_osb_id=self.last_osb_id,
+                selected_osb_name=self.last_osb_name,
+            )
+            retrieval_result["context_osb_source"] = "conversation_state"
+        else:
+            retrieval_result = retrieve(query=query)
 
         # ====================================================
         # 3. AMBIGUOUS STATE KAYDET
@@ -207,6 +219,8 @@ class RAGPipeline:
                     0
                 ),
             }
+
+        self._remember_resolved_osb(retrieval_result)
 
         # ====================================================
         # 4. NORMAL PIPELINE
@@ -335,6 +349,37 @@ class RAGPipeline:
 
         self.pending_query = None
         self.pending_candidates = []
+
+    def _should_use_last_osb(self, query: str) -> bool:
+        """Use prior OSB only for field questions with no explicit OSB name."""
+        if self.last_osb_id is None or extract_osb_name(query):
+            return False
+
+        if detect_intent(query)["intent"] in {"aggregation", "listing"}:
+            return False
+
+        normalized = query.lower()
+        follow_up_terms = (
+            "parsel", "kuruluş", "kurulus", "bölge", "ilçe", "ilce",
+            "istihdam", "çalış", "calis", "kişi", "kisi", "fabrika",
+            "deprem", "yatırım", "yatirim", "sicil", "türü", "turu",
+            "aynı osb", "ayni osb", "bunun",
+        )
+        return any(term in normalized for term in follow_up_terms)
+
+    def _remember_resolved_osb(self, retrieval_result: dict[str, Any]) -> None:
+        """Persist only successful, uniquely resolved OSB retrievals."""
+        osb_id = retrieval_result.get("osb_id")
+        if retrieval_result.get("status") != "success" or osb_id is None:
+            return
+
+        self.last_osb_id = int(osb_id)
+        self.last_osb_name = retrieval_result.get("osb_name")
+        self.last_intent = retrieval_result.get("intent")
+        self.last_requested_field = (
+            retrieval_result.get("requested_field")
+            or detect_requested_field(retrieval_result.get("query", ""))
+        )
 
     # ========================================================
     # PIPELINE RESULT

@@ -49,6 +49,10 @@ from src.retrieval.query_intent import (
     detect_requested_field,
 )
 from src.retrieval.reranker import Reranker
+from src.analytics.osb_aggregation import (
+    aggregate_osbs,
+    resolve_metric,
+)
 
 
 # ============================================================
@@ -457,6 +461,36 @@ def retrieve(
         "intent"
     ]
 
+    # ========================================================
+    # STRUCTURED AGGREGATION
+    # ========================================================
+    # This intentionally runs before resolver, embedding, ChromaDB and
+    # reranking. Aggregations are calculated from normalized CSV rows.
+    if intent == "aggregation":
+
+        aggregation_filters = extract_listing_filters(query)
+        metric = resolve_metric(query)
+        operation = "sum" if metric else "count"
+
+        aggregation_result = aggregate_osbs(
+            **aggregation_filters,
+            metric=metric,
+            operation=operation,
+        )
+
+        return {
+            "status": "aggregation",
+            "query": query,
+            "intent": intent,
+            "intent_confidence": intent_result["confidence"],
+            "chunk_type": None,
+            "osb_id": None,
+            "osb_name": None,
+            "filters": aggregation_filters,
+            "aggregation": aggregation_result,
+            "results": [],
+        }
+
     chunk_type = get_chunk_type(
         intent
     )
@@ -576,11 +610,9 @@ def retrieve(
     )
 
 
-    # --------------------------------------------------------
-    # OSB ENTITY BULUNAMADI
-    # --------------------------------------------------------
-
-    if not osb_name:
+    # A short follow-up has no OSB name.  It can still safely use a selected
+    # OSB ID from an ambiguous choice or conversation state.
+    if not osb_name and selected_osb_id is None:
 
         return {
             "status": "not_found",
@@ -598,10 +630,7 @@ def retrieve(
     # 3. CITY EXTRACTION
     # ========================================================
 
-    city = extract_city(
-        query,
-        osb_name
-    )
+    city = extract_city(query, osb_name)
 
 
     # ========================================================

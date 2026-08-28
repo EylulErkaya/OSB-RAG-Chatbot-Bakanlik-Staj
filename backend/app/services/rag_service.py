@@ -25,6 +25,27 @@ class RAGService:
     ):
         self.pipeline.pending_listing = listing_state
 
+    def restore_last_osb_state(
+        self,
+        *,
+        osb_id: int | None,
+        osb_name: str | None,
+        intent: str | None,
+        requested_field: str | None,
+    ):
+        self.pipeline.last_osb_id = osb_id
+        self.pipeline.last_osb_name = osb_name
+        self.pipeline.last_intent = intent
+        self.pipeline.last_requested_field = requested_field
+
+    def last_osb_state(self) -> dict[str, Any]:
+        return {
+            "last_osb_id": self.pipeline.last_osb_id,
+            "last_osb_name": self.pipeline.last_osb_name,
+            "last_intent": self.pipeline.last_intent,
+            "last_requested_field": self.pipeline.last_requested_field,
+        }
+
     def ask(self, query: str) -> dict[str, Any]:
         """
         Kullanıcı sorusunu mevcut RAG pipeline'a gönderir.
