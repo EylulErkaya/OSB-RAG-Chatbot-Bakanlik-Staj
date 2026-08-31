@@ -140,6 +140,9 @@ for _, osb in osb_df.iterrows():
     establishment_fields = [
         ("OSB kuruluş yılı", "OSB Kuruluş Yılı"),
         ("OSB kuruluş tarihi", "OSB Kuruluş Tarihi"),
+        ("Gerçek kuruluş yılı", "GERÇEK\nKURULUŞ\nYILI"),
+        ("Evrak kayıt tarihi", "Evrak\nKayıt\nTarihi"),
+        ("Geliş tarihleri", "Geliş Tarihleri"),
         ("Yeni dizayn", "Yeni Dizayn"),
     ]
 
@@ -168,6 +171,10 @@ for _, osb in osb_df.iterrows():
             "Toplam Parsel Sayısı (Bölge ve Öngörü)"
         ),
         (
+            "Öngörü parsel sayısı",
+            "Öngörü Parsel"
+        ),
+        (
             "Tahsisi yapılan parsel sayısı",
             "Tahsisi Yapılan Parsellerin Sayısı (m)"
         ),
@@ -194,6 +201,14 @@ for _, osb in osb_df.iterrows():
         (
             "Proje parsel sayısı",
             "Proje (c)"
+        ),
+        (
+            "Parsel birim fiyatı (m²)",
+            "Parsel Birim Fiyat\n(m­²)"
+        ),
+        (
+            "Tahsisli parsel sayısı (a+b+c)",
+            "Tahsisli Parsel Sayısı (a+b+c)"
         ),
         (
             "Boş ve öngörü parsel",

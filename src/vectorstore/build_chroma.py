@@ -104,13 +104,13 @@ has_error = False
 
 if len(chunks) != len(embeddings):
     print(
-        f"❌ Chunk ve embedding sayıları eşleşmiyor!\n"
+        f"[!] Chunk ve embedding sayilari eslesmiyor!\n"
         f"   Chunk: {len(chunks)}\n"
         f"   Embedding: {len(embeddings)}"
     )
     has_error = True
 else:
-    print(f"✓ {len(chunks)} chunk ↔ {len(embeddings)} embedding")
+    print(f"[OK] {len(chunks)} chunk <-> {len(embeddings)} embedding")
 
 
 # --------------------------------------------------
@@ -123,10 +123,10 @@ chunk_ids = [
 ]
 
 if len(chunk_ids) != len(set(chunk_ids)):
-    print("❌ Duplicate chunk_id bulundu!")
+    print("[!] Duplicate chunk_id bulundu!")
     has_error = True
 else:
-    print(f"✓ {len(chunk_ids)} benzersiz chunk ID")
+    print(f"[OK] {len(chunk_ids)} benzersiz chunk ID")
 
 
 # --------------------------------------------------
@@ -137,12 +137,12 @@ actual_dimension = len(embeddings[0]) if embeddings else 0
 
 if actual_dimension != EXPECTED_DIMENSION:
     print(
-        f"❌ Embedding boyutu {EXPECTED_DIMENSION} değil: "
+        f"[!] Embedding boyutu {EXPECTED_DIMENSION} degil: "
         f"{actual_dimension}"
     )
     has_error = True
 else:
-    print(f"✓ Embedding boyutu doğru: {actual_dimension}")
+    print(f"[OK] Embedding boyutu dogru: {actual_dimension}")
 
 
 # --------------------------------------------------
@@ -151,16 +151,16 @@ else:
 
 if model_name != EXPECTED_MODEL:
     print(
-        f"❌ Model beklenenle eşleşmiyor: "
+        f"[!] Model beklenenle eslesmiyor: "
         f"{model_name} != {EXPECTED_MODEL}"
     )
     has_error = True
 else:
-    print(f"✓ Model doğru: {model_name}")
+    print(f"[OK] Model dogru: {model_name}")
 
 
 if has_error:
-    print("\n⚠️ Doğrulama başarısız. ChromaDB oluşturulmadı.")
+    print("\n[!] Dogrulama basarisiz. ChromaDB olusturulmadi.")
     raise SystemExit(1)
 
 
@@ -323,8 +323,8 @@ print(
 if final_count == total:
 
     print(
-        "\n🎉 CHROMADB INDEX BAŞARIYLA OLUŞTURULDU! "
-        f"Kayıt sayısı beklenen değerle eşleşiyor: {final_count}"
+        "\n[OK] CHROMADB INDEX BASARIYLA OLUSTURULDU! "
+        f"Kayit sayisi beklenen degerle eslesiyor: {final_count}"
     )
 
 else:

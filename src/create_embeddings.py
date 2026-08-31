@@ -248,10 +248,10 @@ print(
 
 if len(embeddings) == len(chunks):
 
-    print("\n🎉 TÜM EMBEDDING'LER BAŞARIYLA OLUŞTURULDU.")
+    print("\nTUM EMBEDDING'LER BASARIYLA OLUSTURULDU.")
 
 else:
 
     print(
-        "\n⚠️ Embedding işlemi henüz tamamlanmadı."
+        "\nEmbedding islemi henuz tamamlanmadi."
     )

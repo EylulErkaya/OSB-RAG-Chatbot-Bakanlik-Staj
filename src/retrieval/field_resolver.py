@@ -176,6 +176,44 @@ FIELD_MAPPINGS = [
         ],
         "Aşama",
     ),
+    (
+        [
+            "parsel birim fiyatı",
+            "parsel birim fiyatı nedir",
+            "parsel birim fiyat",
+            "birim fiyatı nedir",
+            "birim fiyatı",
+            "birim fiyat",
+            "metrekare fiyatı",
+            "m2 fiyatı",
+            "m² fiyatı",
+        ],
+        "Parsel Birim Fiyat\n(m­²)",
+    ),
+    (
+        [
+            "öngörü parsel",
+            "öngörülen parsel",
+            "öngörülen parsel sayısı",
+            "öngörü parsel sayısı",
+        ],
+        "Öngörü Parsel",
+    ),
+    (
+        [
+            "tahsisli parsel",
+            "tahsisli parsel sayısı",
+        ],
+        "Tahsisli Parsel Sayısı (a+b+c)",
+    ),
+    (
+        [
+            "gerçek kuruluş yılı",
+            "gerçek kuruluş yılı nedir",
+            "gercek kurulus yili",
+        ],
+        "GERÇEK\nKURULUŞ\nYILI",
+    ),
 ]
 
 SPECIFIC_SECTOR_KEYWORDS = [
