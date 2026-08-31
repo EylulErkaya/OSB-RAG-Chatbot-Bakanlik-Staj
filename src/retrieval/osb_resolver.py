@@ -1,4 +1,5 @@
 import pandas as pd
+from src.retrieval.field_resolver import get_field_value_from_dict
 
 
 # ============================================================
@@ -178,13 +179,7 @@ def compare_candidate_field(
 
         data = candidate.get("data", {})
 
-        value = data.get(field)
-
-        if pd.isna(value):
-            value = None
-
-        if value is not None:
-            value = str(value).strip()
+        value = get_field_value_from_dict(data, field)
 
         values.append(value)
 
@@ -301,8 +296,8 @@ def _normalize_earthquake(value):
     if pd.isna(value):
         return "Hayır"
     return "Evet" if str(value).strip() == "+" else "Hayır"
-    
-    
+
+
 def list_osbs(
     city: str | None = None,
     district: str | None = None,
@@ -387,13 +382,12 @@ def list_osbs(
     }
 
 
-
 # ============================================================
 # TEST
 # ============================================================
 
 if __name__ == "__main__":
-    
+
     print("\n" + "=" * 70)
     print("OSB LİSTELEME TESTİ")
     print("=" * 70)
@@ -459,106 +453,5 @@ if __name__ == "__main__":
 
         print("\n" + "-" * 70)
 
-        print(
-            f"OSB : {osb_name}"
-        )
-
-        print(
-            f"İl  : {city}"
-        )
-
-        result = resolve_osb(
-            osb_name,
-            city
-        )
-
-        print(
-            f"Durum: {result['status']}"
-        )
-
-        if result["status"] == "unique":
-
-            print(
-                f"ID: {result['osb_id']}"
-            )
-
-        elif result["status"] == "ambiguous":
-
-            print("Adaylar:")
-
-            for candidate in result["candidates"]:
-
-                print(
-                    f"  ID {candidate['id']} | "
-                    f"{candidate['name']} | "
-                    f"{candidate['district']}"
-                )
-                
-    print("\n" + "=" * 70)
-    print("PAGINATION TESTİ")
-    print("=" * 70)
-
-    result = list_osbs(
-        limit=10,
-        offset=0,
-    )
-
-    print(
-        f"Toplam kayıt    : {result['total_count']}"
-    )
-
-    print(
-        f"Offset          : {result['offset']}"
-    )
-
-    print(
-        f"Limit           : {result['limit']}"
-    )
-
-    print(
-        f"Dönen kayıt     : {result['returned_count']}"
-    )
-
-    print("\nİlk 10 kayıt:")
-
-    for item in result["results"]:
-
-        print(
-            f"{item['id']} | "
-            f"{item['name']} | "
-            f"{item['city']}"
-        )
-
-
-    print("\n" + "-" * 70)
-
-    result = list_osbs(
-        limit=10,
-        offset=10,
-    )
-
-    print(
-        f"Toplam kayıt    : {result['total_count']}"
-    )
-
-    print(
-        f"Offset          : {result['offset']}"
-    )
-
-    print(
-        f"Limit           : {result['limit']}"
-    )
-
-    print(
-        f"Dönen kayıt     : {result['returned_count']}"
-    )
-
-    print("\n11-20 arasındaki kayıtlar:")
-
-    for item in result["results"]:
-
-        print(
-            f"{item['id']} | "
-            f"{item['name']} | "
-            f"{item['city']}"
-        )
+        res = resolve_osb(osb_name, city)
+        print(f"OSB: {osb_name}, Status: {res['status']}")

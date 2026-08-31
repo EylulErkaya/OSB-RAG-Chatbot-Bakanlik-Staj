@@ -358,14 +358,20 @@ class RAGPipeline:
         if detect_intent(query)["intent"] in {"aggregation", "listing"}:
             return False
 
+        if detect_requested_field(query) is not None:
+            return True
+
         normalized = query.lower()
         follow_up_terms = (
             "parsel", "kuruluş", "kurulus", "bölge", "ilçe", "ilce",
             "istihdam", "çalış", "calis", "kişi", "kisi", "fabrika",
             "deprem", "yatırım", "yatirim", "sicil", "türü", "turu",
+            "evrak", "kayıt", "kayit", "hektar", "büyüklüğü", "buyuklugu",
+            "öngörü", "ongoru", "sektör", "sektor",
             "aynı osb", "ayni osb", "bunun",
         )
         return any(term in normalized for term in follow_up_terms)
+
 
     def _remember_resolved_osb(self, retrieval_result: dict[str, Any]) -> None:
         """Persist only successful, uniquely resolved OSB retrievals."""

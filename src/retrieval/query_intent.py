@@ -1,4 +1,6 @@
 import re
+from src.retrieval.field_resolver import detect_requested_field
+
 
 
 # ============================================================
@@ -232,14 +234,43 @@ def detect_intent(query: str):
                 scores[intent] += 1
                 
     # --------------------------------------------------------
+    # employment chunk'ındaki bilgiyi hedefler.
+
+    production_context_keywords = [
+        "üretimde",
+        "üretimdeki",
+        "inşaatta",
+        "inşaattaki",
+        "projede",
+        "projedeki",
+    ]
+
+    if "parsel" in query and any(
+        keyword in query
+        for keyword in production_context_keywords
+    ):
+        scores["employment"] += 2
+
+    # --------------------------------------------------------
+    # KELİME EŞLEŞMESİ
+    # --------------------------------------------------------
+
+    for intent, keywords in INTENT_RULES.items():
+
+        for keyword in keywords:
+
+            if keyword in query:
+
+                scores[intent] += 1
+                
+    # --------------------------------------------------------
     
     
     # ÖNCELİK KURALLARI
     # --------------------------------------------------------
 
-    # Sektör adı geçiyorsa sektör sorusu önceliklidir.
-    sector_specific_keywords = [
-        "sektör",
+    # Sektör adı veya sektör bazlı istihdam/fabrika bilgisi geçiyorsa sektör sorusu önceliklidir.
+    specific_subsectors = [
         "gıda",
         "tekstil",
         "otomotiv",
@@ -249,12 +280,14 @@ def detect_intent(query: str):
         "metal",
         "plastik",
     ]
+    has_specific_subsector = any(kw in query for kw in specific_subsectors)
+    has_sector_employment_context = ("sektör" in query or "sektörü" in query) and any(
+        w in query for w in ["çalışan", "calisan", "istihdam", "fabrika", "kaç kişi", "kac kisi", "nc"]
+    )
 
-    if any(
-        keyword in query
-        for keyword in sector_specific_keywords
-    ):
+    if has_specific_subsector or has_sector_employment_context:
         scores["sector"] += 2
+
 
     # --------------------------------------------------------
     # EN YÜKSEK SKOR
@@ -404,80 +437,105 @@ if __name__ == "__main__":
             f"{result['confidence']:.2f}"
         )
 
+
+
+# ============================================================
+# CHUNK TYPE HARİTASI
+# ============================================================
+
+INTENT_TO_CHUNK_TYPE = {
+
+    "parcel":
+        "osb_parcel",
+
+    "employment":
+        "osb_employment",
+
+    "sector":
+        "sector",
+
+    "general":
+        "osb_basic",
+}
+
+
+def get_chunk_type(intent: str):
+
+    return INTENT_TO_CHUNK_TYPE.get(
+        intent,
+        "osb_general"
+    )
+
+
+# ============================================================
+# TEST
+# ============================================================
+
+if __name__ == "__main__":
+
+    queries = [
+
+        "Malatya-Güney OSB'de kaç boş parsel var?",
+
+        "Malatya-Güney OSB'de kaç fabrika üretim yapıyor?",
+
+        "Malatya-Güney OSB'de kaç kişi istihdam ediliyor?",
+
+        "Malatya-Güney OSB hangi bölgede bulunuyor?",
+
+        "Malatya-Güney OSB'de gıda sektöründe kaç kişi çalışıyor?",
+
+        "Malatya-Güney OSB'nin sicil numarası nedir?",
+        
+        "Malatya'daki OSB'leri listele",
+
+        "Malatya'daki OSB'leri göster",
+
+        "Türkiye'deki OSB'leri listele",
+
+        "Hangi OSB'ler var?",
+
+        "Malatya OSB listesi",
+    ]
+
+
+    print("=" * 70)
+    print("QUERY INTENT TESTİ")
+    print("=" * 70)
+
+
+    for query in queries:
+
+        result = detect_intent(
+            query
+        )
+
+        intent = result["intent"]
+
+        chunk_type = get_chunk_type(
+            intent
+        )
+
+        print("\n" + "-" * 70)
+
+        print(
+            f"SORU: {query}"
+        )
+
+        print(
+            f"Intent: {intent}"
+        )
+
+        print(
+            f"Chunk type: {chunk_type}"
+        )
+
+        print(
+            f"Confidence: "
+            f"{result['confidence']:.2f}"
+        )
+
         print(
             f"Scores: "
             f"{result['scores']}"
         )
-        
-def detect_requested_field(query: str):
-    """
-    Kullanıcının hangi OSB alanını sorduğunu belirler.
-    """
-
-    query = query.lower().strip()
-
-    field_rules = [
-        (
-            [
-                "kuruluş yılı",
-                "kurulus yili",
-                "kaç yılında kuruldu",
-                "ne zaman kuruldu",
-            ],
-            "OSB Kuruluş Yılı",
-        ),
-        (
-            [
-                "kuruluş tarihi",
-                "kurulus tarihi",
-                "kuruluş tarihi nedir",
-            ],
-            "OSB Kuruluş Tarihi",
-        ),
-        (
-            [
-                "hangi bölgede",
-                "hangi bölge",
-            ],
-            "Bölge",
-        ),
-        (
-            [
-                "hangi ilde",
-                "hangi il",
-            ],
-            "İl Adı",
-        ),
-        (
-            [
-                "hangi ilçede",
-                "hangi ilçe",
-                "ilçesi nedir",
-            ],
-            "İlçe",
-        ),
-        (
-            [
-                "teşvik bölgesi",
-                "kaçıncı teşvik",
-            ],
-            "Teşvik Bölgelerine Göre İller",
-        ),
-        (
-            [
-                "osb türü",
-                "türü nedir",
-                "hangi tür",
-            ],
-            "OSB Türü",
-        ),
-    ]
-
-    for keywords, field in field_rules:
-
-        for keyword in keywords:
-
-            if keyword in query:
-                return field
-
-    return None

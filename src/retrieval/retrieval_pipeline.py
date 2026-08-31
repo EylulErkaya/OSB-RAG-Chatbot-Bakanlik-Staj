@@ -31,7 +31,12 @@ from src.retrieval.osb_resolver import (
     resolve_osb,
     compare_candidate_field,
     list_osbs,
+    osb_df,
+)
 
+from src.retrieval.field_resolver import (
+    detect_requested_field,
+    get_field_value_from_dict,
 )
 
 from .sector_resolver import (
@@ -46,7 +51,6 @@ from .sector_resolver import (
 from src.retrieval.query_intent import (
     detect_intent,
     get_chunk_type,
-    detect_requested_field,
 )
 from src.retrieval.reranker import Reranker
 from src.analytics.osb_aggregation import (
@@ -822,6 +826,15 @@ def retrieve(
 
         resolved_osb_name = osb_result["osb_name"]
 
+    requested_field = detect_requested_field(query)
+    requested_field_val = None
+    if requested_field and osb_id is not None:
+        matches = osb_df[osb_df["ID"] == osb_id]
+        if not matches.empty:
+            requested_field_val = get_field_value_from_dict(
+                matches.iloc[0].to_dict(), requested_field
+            )
+
 
     # ========================================================
     # 5. QUERY EMBEDDING
@@ -894,6 +907,35 @@ def retrieve(
 
     if not documents:
 
+        if requested_field and requested_field_val is not None:
+            return {
+                "status": "success",
+                "query": query,
+                "intent": intent,
+                "intent_confidence": intent_confidence,
+                "chunk_type": chunk_type,
+                "osb_id": osb_id,
+                "osb_name": resolved_osb_name,
+                "requested_field": requested_field,
+                "results": [
+                    {
+                        "document": (
+                            f"OSB: {resolved_osb_name}\n"
+                            f"- {requested_field}: {requested_field_val}"
+                        ),
+                        "metadata": {
+                            "osb_id": osb_id,
+                            "osb_adi": resolved_osb_name,
+                            "chunk_type": chunk_type,
+                            "requested_field": requested_field,
+                            "resolved_value": requested_field_val,
+                        },
+                        "distance": None,
+                        "reranker_score": None,
+                    }
+                ],
+            }
+
         return {
             "status": "success",
             "query": query,
@@ -902,6 +944,7 @@ def retrieve(
             "chunk_type": chunk_type,
             "osb_id": osb_id,
             "osb_name": resolved_osb_name,
+            "requested_field": requested_field,
             "results": [],
         }
 
@@ -961,7 +1004,14 @@ def retrieve(
         query=query,
         candidates=candidates,
         top_k=rerank_top_k,
-)
+    )
+
+    if requested_field and requested_field_val is not None and reranked:
+        top_doc = reranked[0]["document"]
+        if f"{requested_field}:" not in top_doc and f"{requested_field} :" not in top_doc:
+            reranked[0]["document"] = f"{top_doc}\n- {requested_field}: {requested_field_val}"
+            reranked[0]["metadata"]["requested_field"] = requested_field
+            reranked[0]["metadata"]["requested_field_val"] = requested_field_val
 
     # ========================================================
     # 10. FINAL RESULT
@@ -975,6 +1025,7 @@ def retrieve(
         "chunk_type": chunk_type,
         "osb_id": osb_id,
         "osb_name": resolved_osb_name,
+        "requested_field": requested_field,
         "results": reranked,
     }
 

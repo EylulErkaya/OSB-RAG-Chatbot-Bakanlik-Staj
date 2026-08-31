@@ -21,7 +21,7 @@ class Reranker:
         )
 
         print(
-            "✓ Reranker hazır"
+            "Reranker hazır"
         )
 
     def rerank(
